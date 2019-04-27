@@ -36,6 +36,26 @@ MARK_AS_ADVANCED(XLUA_PROJECT_DIR)
 set(LUA_SRC_PATH lua-5.3.5/src)
 set(LUAJIT_SRC_PATH luajit-2.1.0b3/src)
 
+#begin yasio
+set (YASIO_SRC
+    yasio/yasio/ibstream.cpp
+    yasio/yasio/obstream.cpp
+    yasio/yasio/xxsocket.cpp
+    yasio/yasio/yasio.cpp
+    yasio/yasio/impl/lyasio.cpp
+    yasio/yasio/impl/yasio-ni.cpp
+)
+set_property(
+    SOURCE ${YASIO_SRC}
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS
+    YASIO_BUILD_AS_DLL
+    YASIO_LIB
+)
+list(APPEND THIRDPART_INC  yasio)
+set (THIRDPART_SRC ${THIRDPART_SRC} ${YASIO_SRC})
+#end yasio
+
 if (USING_LUAJIT)
 	
     if (APPLE AND NOT IOS AND NOT ANDROID)
