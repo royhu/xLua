@@ -37,6 +37,10 @@ set(LUA_SRC_PATH lua-5.3.5/src)
 set(LUAJIT_SRC_PATH luajit-2.1.0b3/src)
 
 #begin yasio
+if (NOT WIN32 OR CYGWIN)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+endif()
+
 set (YASIO_SRC
     yasio/yasio/ibstream.cpp
     yasio/yasio/obstream.cpp
