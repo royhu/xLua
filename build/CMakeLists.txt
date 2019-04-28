@@ -42,7 +42,11 @@ if (NOT WIN32 OR CYGWIN)
 endif()
 
 if (ANDROID)
-    set(THIRDPART_LIB "${THIRDPART_LIB} -llog")
+    if (NOT THIRDPART_LIB)
+        set(THIRDPART_LIB "-llog")
+    else()
+        set(THIRDPART_LIB "${THIRDPART_LIB} -llog")
+    endif()
 endif()
 
 set (YASIO_SRC
