@@ -1,3 +1,6 @@
 [submodule "build/yasio"]
 	path = build/yasio
 	url = https://github.com/halx99/yasio
+[submodule "build/lua-cjson"]
+	path = build/lua-cjson
+	url = https://github.com/halx99/lua-cjson
