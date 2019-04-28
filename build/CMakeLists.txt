@@ -38,7 +38,11 @@ set(LUAJIT_SRC_PATH luajit-2.1.0b3/src)
 
 #begin yasio
 if (NOT WIN32 OR CYGWIN)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+endif()
+
+if (ANDROID)
+    set(THIRDPART_LIB "${THIRDPART_LIB} -llog")
 endif()
 
 set (YASIO_SRC
@@ -53,8 +57,6 @@ set_property(
     SOURCE ${YASIO_SRC}
     APPEND
     PROPERTY COMPILE_DEFINITIONS
-    YASIO_BUILD_AS_DLL
-    YASIO_LIB
 )
 list(APPEND THIRDPART_INC  yasio)
 set (THIRDPART_SRC ${THIRDPART_SRC} ${YASIO_SRC})
