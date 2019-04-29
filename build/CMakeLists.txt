@@ -66,6 +66,21 @@ list(APPEND THIRDPART_INC  yasio)
 set (THIRDPART_SRC ${THIRDPART_SRC} ${YASIO_SRC})
 #end yasio
 
+#lua-cjson
+set (LUACJSON_SRC
+    lua-cjson/lua_cjson.c
+    lua-cjson/fpconv.c
+    lua-cjson/strbuf.c
+)
+set_property(
+    SOURCE ${LUACJSON_SRC}
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS
+)
+list(APPEND THIRDPART_INC  lua-cjson)
+set (THIRDPART_SRC ${THIRDPART_SRC} ${LUACJSON_SRC})
+#end lua-cjson
+
 if (USING_LUAJIT)
 	
     if (APPLE AND NOT IOS AND NOT ANDROID)
