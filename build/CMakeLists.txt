@@ -72,11 +72,21 @@ set (LUACJSON_SRC
     lua-cjson/fpconv.c
     lua-cjson/strbuf.c
 )
+if (USING_LUAJIT)
+set_property(
+    SOURCE ${LUACJSON_SRC}
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS
+    USING_LUAJIT
+)
+else()
 set_property(
     SOURCE ${LUACJSON_SRC}
     APPEND
     PROPERTY COMPILE_DEFINITIONS
 )
+endif()
+
 list(APPEND THIRDPART_INC  lua-cjson)
 set (THIRDPART_SRC ${THIRDPART_SRC} ${LUACJSON_SRC})
 #end lua-cjson
