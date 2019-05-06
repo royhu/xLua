@@ -91,6 +91,18 @@ list(APPEND THIRDPART_INC  lua-cjson)
 set (THIRDPART_SRC ${THIRDPART_SRC} ${LUACJSON_SRC})
 #end lua-cjson
 
+#pbc-lua
+set (PBC_LUA_SRC
+    protoc-gen-lua/protobuf/pb.c
+)
+set_property(
+    SOURCE ${PBC_LUA_SRC}
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS
+)
+set (THIRDPART_SRC ${THIRDPART_SRC} ${PBC_LUA_SRC})
+#end pbc-lua
+
 if (USING_LUAJIT)
 	
     if (APPLE AND NOT IOS AND NOT ANDROID)
