@@ -1,9 +1,12 @@
 [submodule "build/yasio"]
 	path = build/yasio
 	url = https://github.com/halx99/yasio
+	branch = master
 [submodule "build/lua-cjson"]
 	path = build/lua-cjson
 	url = https://github.com/halx99/lua-cjson
+	branch = master
 [submodule "build/protoc-gen-lua"]
 	path = build/protoc-gen-lua
 	url = https://github.com/halx99/protoc-gen-lua
+	branch = master
