@@ -300,3 +300,9 @@ else ( )
         )
     endif()
 endif ( )
+
+if (ANDROID AND ANDROID_STRIP_EXEC)
+    add_custom_command(TARGET xlua POST_BUILD
+        COMMAND ${ANDROID_STRIP_EXEC} ${PROJECT_BINARY_DIR}/libxlua.so -o ${PROJECT_BINARY_DIR}/libxlua.so
+    )
+endif()
