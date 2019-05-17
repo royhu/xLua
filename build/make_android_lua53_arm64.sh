@@ -1,5 +1,5 @@
 if [ -z "$ANDROID_NDK" ]; then
-    export ANDROID_NDK=~/android-ndk-r10e
+    export ANDROID_NDK=~/android-ndk-r19c
 fi
 
 PLATFORM=mac
@@ -7,7 +7,7 @@ if [ "$1" == "linux" ]; then
 	PLATFORM=linux
 fi
 
-TOOL_CHAIN_PATH=$(pwd)
+TOOL_CHAIN_PATH=$ANDROID_NDK/build
 
 echo make armeabi-v7a ================================================
 if [ "$PLATFORM" == "linux" ]; then
