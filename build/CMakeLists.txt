@@ -63,7 +63,7 @@ set_property(
     APPEND
     PROPERTY COMPILE_DEFINITIONS
 )
-list(APPEND THIRDPART_INC  yasio)
+list(APPEND THIRDPART_INC yasio)
 set (THIRDPART_SRC ${THIRDPART_SRC} ${YASIO_SRC})
 #end yasio
 
@@ -104,6 +104,21 @@ set_property(
 set (THIRDPART_SRC ${THIRDPART_SRC} ${PBC_LUA_SRC})
 #end pbc-lua
 
+#fsni
+set (FSNI_SRC
+    fsni/ioapi.c
+    fsni/unzip.c
+    fsni/fsni.cpp
+)
+set_property(
+    SOURCE ${FSNI_SRC}
+    APPEND
+    PROPERTY COMPILE_DEFINITIONS
+)
+list(APPEND THIRDPART_INC zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib)
+set (THIRDPART_SRC ${THIRDPART_SRC} ${FSNI_SRC})
+#end fsni
+
 if (USING_LUAJIT)
 	
     if (APPLE AND NOT IOS AND NOT ANDROID)
@@ -132,7 +147,7 @@ if (USING_LUAJIT)
     endif ()
 	set ( LUA_LIB )
 else ()
-	set ( LUA_IDSIZE 120 CACHE NUMBER "gives the maximum size for the description of the source." )
+	set ( LUA_IDSIZE 120 CACHE STRING "gives the maximum size for the description of the source." )
 
 	configure_file ( ${LUA_SRC_PATH}/luaconf.h.in ${CMAKE_CURRENT_BINARY_DIR}/luaconf.h )
 
@@ -305,3 +320,6 @@ if (ANDROID AND ANDROID_STRIP_EXEC)
         COMMAND ${ANDROID_STRIP_EXEC} ${PROJECT_BINARY_DIR}/libxlua.so -o ${PROJECT_BINARY_DIR}/libxlua.so
     )
 endif()
+
+ADD_SUBDIRECTORY(zlib)
+target_link_libraries(xlua zlibstatic)
