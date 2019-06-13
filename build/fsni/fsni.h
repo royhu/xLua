@@ -189,9 +189,11 @@ public:
 extern "C" {
    FSNI_API	void fsni_init(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/);
    FSNI_API voidp fsni_open(const char* path);
-   FSNI_API int fsni_read(voidp fp, voidp buf, int size);
+   FSNI_API int fsni_read(voidp fp, voidp buf, int size); // DLLimport( nt fsni_read(voidp fp, byte[] buf, int size)
    FSNI_API int fsni_seek(voidp fp, int offset, int origin);
    FSNI_API void fsni_close(voidp fp);
+   FSNI_API int fsni_getsize(voidp fp);
+   FSNI_API void fsni_cleanup();
 }
 
 #endif // __SUPPORT_ZIPUTILS_H__

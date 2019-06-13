@@ -604,6 +604,15 @@ extern "C" {
 		}
 		// #endif
 	}
+	void fsni_cleanup()
+	{
+		s_streamingPath.clear();
+		s_persistPath.clear();
+		if (s_zipFile != nullptr) {
+			delete s_zipFile;
+			s_zipFile = nullptr;
+		}
+	}
 
 	voidp fsni_open(const char* fileName)
 	{
@@ -646,7 +655,7 @@ extern "C" {
 					return posix_read((int)nfs->entry, buf, size);
 			}
 			else {
-				int n = 0;
+				int n = -1;
 				do {
 					auto entry = (ZipEntryInfo*)nfs->entry;
 					CC_BREAK_IF(entry != nullptr);
@@ -675,7 +684,7 @@ extern "C" {
 			}
 		}
 
-		return 0;
+		return -1;
 	}
 
 	int fsni_seek(voidp fp, int offset, int origin)
@@ -730,4 +739,10 @@ extern "C" {
 		}
 	}
 
+	int fsni_getsize(voidp fp)
+	{
+		int size = fsni_seek(fp, 0, SEEK_END);
+		fsni_seek(fp, 0, SEEK_SET);
+		return size;
+	}
 }
