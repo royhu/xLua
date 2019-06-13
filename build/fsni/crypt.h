@@ -118,6 +118,7 @@ static int cryptrand(unsigned char *buf, unsigned int len)
     return rlen;
 #else
     static unsigned calls = 0;              /* ensure different random header each time */
+    unsigned int i;
     /* First generate RAND_HEAD_LEN-2 random bytes. We encrypt the
 * output of rand() to get less predictability, since rand() is
 * often poorly implemented.
@@ -126,7 +127,7 @@ static int cryptrand(unsigned char *buf, unsigned int len)
     {
         srand((unsigned)(time(NULL) ^ ZCR_SEED2));
     }
-    for(unsigned int i = 0; i < len; ++i){
+    for(i = 0; i < len; ++i){
         buf[i] = rand() % 256;
     }
     return len;
