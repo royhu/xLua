@@ -658,7 +658,7 @@ extern "C" {
 				int n = -1;
 				do {
 					auto entry = (ZipEntryInfo*)nfs->entry;
-					CC_BREAK_IF(entry != nullptr);
+					CC_BREAK_IF(entry == nullptr);
 
 					auto shared_data = s_zipFile->m_data;
 					CC_BREAK_IF(nfs->offset >= entry->uncompressed_size);
