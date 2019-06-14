@@ -189,7 +189,7 @@ struct fsni_stream {
 };
 
 extern "C" {
-    void fsni_init(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/)
+    void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/)
     {
         s_streamingPath = pszStreamingPath;
         s_persistPath = pszPersistPath;

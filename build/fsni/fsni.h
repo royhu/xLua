@@ -93,7 +93,7 @@ public:
 The File Stream Native Interface
 DllImports for C#
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
-public static extern void fsni_init(string streamingAssetPath, string persistDataPath);
+public static extern void fsni_startup(string streamingAssetPath, string persistDataPath);
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
 public static extern IntPtr fsni_open(string fileName);
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
@@ -108,7 +108,7 @@ public static extern int fsni_getsize(IntPtr fp);
 public static extern void fsni_cleanup();
 */
 extern "C" {
-    FSNI_API	void fsni_init(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/);
+    FSNI_API void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/);
     FSNI_API voidp fsni_open(const char* path);
     FSNI_API int fsni_read(voidp fp, voidp buf, int size); // DLLimport( nt fsni_read(voidp fp, byte[] buf, int size)
     FSNI_API int fsni_seek(voidp fp, int offset, int origin);

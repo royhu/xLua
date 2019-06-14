@@ -321,5 +321,5 @@ if (ANDROID AND ANDROID_STRIP_EXEC)
     )
 endif()
 
-ADD_SUBDIRECTORY(zlib)
+ADD_SUBDIRECTORY(zlib EXCLUDE_FROM_ALL)
 target_link_libraries(xlua zlibstatic)
