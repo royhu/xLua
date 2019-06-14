@@ -53,6 +53,9 @@ THE SOFTWARE.
 #define posix_lseek ::lseek
 #define posix_read ::read
 #define posix_write ::write
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #endif
 
 #define CC_BREAK_IF(cond) if(cond) break
