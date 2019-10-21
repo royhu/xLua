@@ -55,8 +55,8 @@ set (YASIO_SRC
     yasio/yasio/obstream.cpp
     yasio/yasio/xxsocket.cpp
     yasio/yasio/yasio.cpp
-    yasio/yasio/impl/lyasio.cpp
-    yasio/yasio/impl/yasio_ni.cpp
+    yasio/yasio/bindings/lyasio.cpp
+    yasio/yasio/bindings/yasio_ni.cpp
 )
 set_property(
     SOURCE ${YASIO_SRC}
