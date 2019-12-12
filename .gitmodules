@@ -1,6 +1,6 @@
 [submodule "build/yasio"]
 	path = build/yasio
-	url = https://github.com/halx99/yasio
+	url = https://github.com/simdsoft/yasio
 	branch = master
 [submodule "build/lua-cjson"]
 	path = build/lua-cjson
