@@ -29,7 +29,7 @@ THE SOFTWARE.
 
 #include "fsni.h"
 #include "unzip.h"
-#include <map>
+#include <unordered_map>
 #include <thread>
 #include <mutex>
 
@@ -37,6 +37,7 @@ THE SOFTWARE.
 #include <string.h>
 
 #include "yasio/cxx17/string_view.hpp"
+#include "yasio/detail/object_pool.hpp"
 
 #if defined(_WIN32)
 #define O_READ_FLAGS O_BINARY | O_RDONLY, S_IREAD
@@ -87,7 +88,7 @@ public:
     std::mutex zipFileMtx;
 
     // std::unordered_map is faster if available on the platform
-    typedef std::map<std::string, struct ZipEntryInfo> FileListContainer;
+    typedef std::unordered_map<std::string, struct ZipEntryInfo> FileListContainer;
     FileListContainer fileList;
 };
 
@@ -149,7 +150,7 @@ bool ZipFile::setFilter(const std::string& filter)
                     ZipEntryInfo entry;
                     entry.pos = posInfo;
                     entry.uncompressed_size = (uLong)fileInfo.uncompressed_size;
-                    m_data->fileList[currentFileName.data()] = entry;
+                    m_data->fileList[currentFileName.substr(filter.size()).data()] = entry;
                 }
             }
             // next file - also get the information about it
@@ -178,11 +179,12 @@ bool ZipFile::fileExists(const std::string& fileName) const
 
 // -------------------- fsni ---------------------
 
-static std::string s_streamingPath, s_persistPath;
-static ZipFile* s_zipFile = nullptr;
+
 #define FSNI_INVALID_FILE_HANDLE -1
 #define APK_PREFIX "jar:file://"
 #define APK_PREFIX_LEN sizeof(APK_PREFIX)
+static std::string s_streamingPath, s_persistPath;
+static ZipFile* s_zipFile = nullptr;
 
 struct fsni_stream {
     union {
@@ -192,6 +194,8 @@ struct fsni_stream {
     uLong offset;
     bool streaming; // whether in apk or obb file.
 };
+
+static yasio::gc::object_pool<fsni_stream, std::recursive_mutex> s_fsni_pool;
 
 extern "C" {
     void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/)
@@ -205,6 +209,7 @@ extern "C" {
             if (endpos != std::string::npos) {
                 std::string apkPath = s_streamingPath.substr(APK_PREFIX_LEN - 1, endpos - APK_PREFIX_LEN + 1);
                 std::string strFilter = s_streamingPath.substr(endpos + 1);
+                if (strFilter.back() != '/') strFilter.push_back('/');
                 s_zipFile = new ZipFile(apkPath, strFilter);
                 if (!s_zipFile->isOpen()) {
                     delete s_zipFile;
@@ -250,9 +255,10 @@ extern "C" {
         }
 
         if ((!streaming && fd != FSNI_INVALID_FILE_HANDLE) || (streaming && entry != nullptr)) {
-            fsni_stream* f = (fsni_stream*)calloc(1, sizeof(fsni_stream));
+            fsni_stream* f = (fsni_stream*)s_fsni_pool.allocate();
             if (f != nullptr) {
                 f->entry = entry;
+                f->offset = 0;
                 f->streaming = streaming;
                 return f;
             }
@@ -349,7 +355,7 @@ extern "C" {
                 if (nfs->fd != FSNI_INVALID_FILE_HANDLE)
                     posix_close(nfs->fd);
             }
-            free(nfs);
+            s_fsni_pool.deallocate(nfs);
         }
     }
 
