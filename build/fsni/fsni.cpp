@@ -26,7 +26,8 @@ THE SOFTWARE.
 #include <stdlib.h>
 
 #if defined(__ANDROID__)
-#define LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
+#include <android/log.h>
+#define LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,"FSNI",__VA_ARGS__)
 #else
 #define LOGD(...)
 #endif
@@ -237,12 +238,12 @@ extern "C" {
                 std::string strFilter = s_streamingPath.substr(endpos + 1);
                 s_zipFile = new ZipFile(apkPath, strFilter);
                 if (!s_zipFile->isOpen()) {
-                    LOGD("fsni_startup ----> open %s failed, filter: %s", apkPath, strFilter.c_str());
+                    LOGD("fsni_startup ----> open %s failed, filter: %s", apkPath.c_str(), strFilter.c_str());
                     delete s_zipFile;
                     s_zipFile = nullptr;
                 }
                 else {
-                    LOGD("fsni_startup ----> open %s succeed, filter: %s", apkPath, strFilter.c_str());
+                    LOGD("fsni_startup ----> open %s succeed, filter: %s", apkPath.c_str(), strFilter.c_str());
                 }
             }
         }
