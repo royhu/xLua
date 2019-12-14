@@ -4,12 +4,12 @@
 	branch = master
 [submodule "build/lua-cjson"]
 	path = build/lua-cjson
-	url = https://github.com/halx99/lua-cjson
+	url = https://github.com/simdsoft/lua-cjson
 	branch = master
 [submodule "build/protoc-gen-lua"]
 	path = build/protoc-gen-lua
-	url = https://github.com/halx99/protoc-gen-lua
+	url = https://github.com/simdsoft/protoc-gen-lua
 	branch = master
 [submodule "build/zlib"]
 	path = build/zlib
-	url = https://github.com/madler/zlib
+	url = https://github.com/simdsoft/zlib
