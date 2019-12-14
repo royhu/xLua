@@ -25,10 +25,22 @@ THE SOFTWARE.
 #include <assert.h>
 #include <stdlib.h>
 
+#if defined(__ANDROID__)
+#define LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,LOG_TAG,__VA_ARGS__)
+#else
+#define LOGD(...)
+#endif
+
 #define LUA_LIB
 
+#define MZ_2_9_1 0
+
 #include "fsni.h"
+#if !MZ_2_9_1
 #include "unzip.h"
+#else
+#include "mz_compat.h"
+#endif
 #include <unordered_map>
 #include <thread>
 #include <mutex>
@@ -133,12 +145,22 @@ bool ZipFile::setFilter(const std::string& filter)
         char szCurrentFileName[UNZ_MAXFILENAMEINZIP + 1];
         unz_file_info64 fileInfo;
 
+#if !MZ_2_9_1
         // go through all files and store position information about the required files
         int err = unzGoToFirstFile64(m_data->zipFile, &fileInfo,
             szCurrentFileName, sizeof(szCurrentFileName) - 1);
+#else
+        int err = unzGoToFirstFile(m_data->zipFile);
+#endif
         while (err == UNZ_OK)
         {
+#if MZ_2_9_1
+            char extra[128];
+            unzGetCurrentFileInfo64(m_data->zipFile, &fileInfo, szCurrentFileName, sizeof(szCurrentFileName), extra,
+                sizeof(extra), NULL, -1);
+#endif
             unz_file_pos posInfo;
+
             int posErr = unzGetFilePos(m_data->zipFile, &posInfo);
             if (posErr == UNZ_OK)
             {
@@ -154,8 +176,12 @@ bool ZipFile::setFilter(const std::string& filter)
                 }
             }
             // next file - also get the information about it
+#if !MZ_2_9_1
             err = unzGoToNextFile64(m_data->zipFile, &fileInfo,
                 szCurrentFileName, sizeof(szCurrentFileName) - 1);
+#else
+            err = unzGoToNextFile(m_data->zipFile);
+#endif
         }
         ret = true;
 
@@ -211,8 +237,12 @@ extern "C" {
                 std::string strFilter = s_streamingPath.substr(endpos + 1);
                 s_zipFile = new ZipFile(apkPath, strFilter);
                 if (!s_zipFile->isOpen()) {
+                    LOGD("fsni_startup ----> open %s failed, filter: %s", apkPath, strFilter.c_str());
                     delete s_zipFile;
                     s_zipFile = nullptr;
+                }
+                else {
+                    LOGD("fsni_startup ----> open %s succeed, filter: %s", apkPath, strFilter.c_str());
                 }
             }
         }
@@ -233,6 +263,8 @@ extern "C" {
             voidp entry;
             int fd;
         };
+
+        LOGD("fsni_open ----> %s", fileName);
 
         // try open from hot update path disk
         std::string fullPath = s_persistPath + fileName;
@@ -262,6 +294,8 @@ extern "C" {
                 return f;
             }
         }
+
+        LOGD("fsni_open ----> %s failed!", fileName);
         return nullptr;
     }
 
@@ -289,7 +323,8 @@ extern "C" {
 
                     nRet = unzOpenCurrentFile(shared_data->zipFile);
 
-                    nRet = unzSeek64(shared_data->zipFile, nfs->offset, SEEK_SET);
+                    if (nfs->offset > 0)
+                        nRet = unzSeek64(shared_data->zipFile, nfs->offset, SEEK_SET);
                     n = unzReadCurrentFile(shared_data->zipFile, buf, size);
                     if (n > 0) {
                         nfs->offset += n;
