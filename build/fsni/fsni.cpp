@@ -199,13 +199,11 @@ extern "C" {
         s_streamingPath = pszStreamingPath;
         s_persistPath = pszPersistPath;
 
-        // finally, uncomment
-        std::string apkPath;
         if (cxx20::starts_with(cxx17::string_view(s_streamingPath), APK_PREFIX))
         {
             auto endpos = s_streamingPath.find_last_of('!');
             if (endpos != std::string::npos) {
-                apkPath = s_streamingPath.substr(APK_PREFIX_LEN - 1, endpos - APK_PREFIX_LEN + 1);
+                std::string apkPath = s_streamingPath.substr(APK_PREFIX_LEN - 1, endpos - APK_PREFIX_LEN + 1);
                 std::string strFilter = s_streamingPath.substr(endpos + 1);
                 s_zipFile = new ZipFile(apkPath, strFilter);
                 if (!s_zipFile->isOpen()) {
