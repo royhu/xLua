@@ -36,6 +36,8 @@ THE SOFTWARE.
 // memcpy
 #include <string.h>
 
+#include "yasio/cxx17/string_view.hpp"
+
 #if defined(_WIN32)
 #define O_READ_FLAGS O_BINARY | O_RDONLY, S_IREAD
 #define O_WRITE_FLAGS O_CREAT | O_RDWR | O_BINARY, S_IWRITE | S_IREAD
@@ -139,15 +141,15 @@ bool ZipFile::setFilter(const std::string& filter)
             int posErr = unzGetFilePos(m_data->zipFile, &posInfo);
             if (posErr == UNZ_OK)
             {
-                std::string currentFileName = szCurrentFileName;
                 // cache info about filtered files only (like 'assets/')
+                cxx17::string_view currentFileName = szCurrentFileName;
                 if (filter.empty()
-                    || currentFileName.substr(0, filter.length()) == filter)
+                    || cxx20::starts_with(currentFileName, cxx17::string_view(filter)))
                 {
                     ZipEntryInfo entry;
                     entry.pos = posInfo;
                     entry.uncompressed_size = (uLong)fileInfo.uncompressed_size;
-                    m_data->fileList[currentFileName] = entry;
+                    m_data->fileList[currentFileName.data()] = entry;
                 }
             }
             // next file - also get the information about it
@@ -179,6 +181,9 @@ bool ZipFile::fileExists(const std::string& fileName) const
 static std::string s_streamingPath, s_persistPath;
 static ZipFile* s_zipFile = nullptr;
 #define FSNI_INVALID_FILE_HANDLE -1
+#define APK_PREFIX "jar:file://"
+#define APK_PREFIX_LEN sizeof(APK_PREFIX)
+
 struct fsni_stream {
     union {
         voidp entry;
@@ -195,13 +200,20 @@ extern "C" {
         s_persistPath = pszPersistPath;
 
         // finally, uncomment
-    // #if defined(ANDROID)
-        s_zipFile = new ZipFile(pszStreamingPath);
-        if (!s_zipFile->isOpen()) {
-            delete s_zipFile;
-            s_zipFile = nullptr;
+        std::string apkPath;
+        if (cxx20::starts_with(cxx17::string_view(s_streamingPath), APK_PREFIX))
+        {
+            auto endpos = s_streamingPath.find_last_of('!');
+            if (endpos != std::string::npos) {
+                apkPath = s_streamingPath.substr(APK_PREFIX_LEN - 1, endpos - APK_PREFIX_LEN + 1);
+                std::string strFilter = s_streamingPath.substr(endpos + 1);
+                s_zipFile = new ZipFile(apkPath, strFilter);
+                if (!s_zipFile->isOpen()) {
+                    delete s_zipFile;
+                    s_zipFile = nullptr;
+                }
+            }
         }
-        // #endif
     }
     void fsni_cleanup()
     {
