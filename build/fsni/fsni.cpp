@@ -231,11 +231,13 @@ extern "C" {
         s_persistPath = pszPersistPath;
 
         if (cxx20::starts_with(cxx17::string_view(s_streamingPath), APK_PREFIX))
-        {
-            auto endpos = s_streamingPath.find_last_of('!');
+        { // Android streamingPath format: jar:file://${APK_PATH}!/assets/
+            // [FSNI] Init, streamingAssetsPath: jar:file:///data/app/com.c4games.redalert3d-TBAXBO37ccSyzWzUsJwcHQ==/base.apk!/assets
+            // because filter always full relative to zip file, so should remove prefix
+            auto endpos = s_streamingPath.rfind("!/");
             if (endpos != std::string::npos) {
                 std::string apkPath = s_streamingPath.substr(APK_PREFIX_LEN - 1, endpos - APK_PREFIX_LEN + 1);
-                std::string strFilter = s_streamingPath.substr(endpos + 1);
+                std::string strFilter = s_streamingPath.substr(endpos + 2);
                 s_zipFile = new ZipFile(apkPath, strFilter);
                 if (!s_zipFile->isOpen()) {
                     LOGD("fsni_startup ----> open %s failed, filter: %s", apkPath.c_str(), strFilter.c_str());
