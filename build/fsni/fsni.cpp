@@ -209,7 +209,6 @@ extern "C" {
             if (endpos != std::string::npos) {
                 std::string apkPath = s_streamingPath.substr(APK_PREFIX_LEN - 1, endpos - APK_PREFIX_LEN + 1);
                 std::string strFilter = s_streamingPath.substr(endpos + 1);
-                if (strFilter.back() != '/') strFilter.push_back('/');
                 s_zipFile = new ZipFile(apkPath, strFilter);
                 if (!s_zipFile->isOpen()) {
                     delete s_zipFile;
