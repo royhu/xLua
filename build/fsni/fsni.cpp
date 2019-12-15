@@ -27,9 +27,11 @@ THE SOFTWARE.
 
 #if defined(__ANDROID__)
 #include <android/log.h>
-#define LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,"FSNI",__VA_ARGS__)
+#define FSNI_LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,"FSNI",__VA_ARGS__)
+#define FSNI_LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,"FSNI",__VA_ARGS__)
 #else
-#define LOGD(...)
+#define FSNI_LOGD(...)
+#define FSNI_LOGE(...)
 #endif
 
 #define LUA_LIB
@@ -152,7 +154,7 @@ bool ZipFile::setFilter(const std::string& filter)
                 // cache info about filtered files only (like 'assets/')
                 cxx17::string_view currentFileName = szCurrentFileName;
                 if (filter.empty()
-                    || cxx20::starts_with(currentFileName, cxx17::string_view(filter)))
+                    || (currentFileName.size() > filter.size() && cxx20::starts_with(currentFileName, cxx17::string_view(filter))))
                 {
                     ZipEntryInfo entry;
                     entry.pos = posInfo;
@@ -225,12 +227,8 @@ extern "C" {
                 std::string strFilter = s_streamingPath.substr(endpos + 2);
                 s_zipFile = new ZipFile(apkPath, strFilter);
                 if (!s_zipFile->isOpen()) {
-                    LOGD("fsni_startup ----> open %s failed, filter: %s", apkPath.c_str(), strFilter.c_str());
                     delete s_zipFile;
                     s_zipFile = nullptr;
-                }
-                else {
-                    LOGD("fsni_startup ----> open %s succeed, filter: %s", apkPath.c_str(), strFilter.c_str());
                 }
             }
         }
@@ -251,8 +249,6 @@ extern "C" {
             voidp entry;
             int fd;
         };
-
-        LOGD("fsni_open ----> %s", fileName);
 
         // try open from hot update path disk
         std::string fullPath = s_persistPath + fileName;
@@ -283,7 +279,7 @@ extern "C" {
             }
         }
 
-        LOGD("fsni_open ----> %s failed!", fileName);
+        FSNI_LOGE("fsni_open ----> %s failed!", fileName);
         return nullptr;
     }
 

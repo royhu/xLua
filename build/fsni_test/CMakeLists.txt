@@ -17,5 +17,12 @@ add_custom_command(TARGET fsni_test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_FILE_DIR:xlua>/xlua.dll
         $<TARGET_FILE_DIR:fsni_test>/
-    COMMENT "copying xlua.dll..."
+    COMMENT "copying xlua.dll...\n"
         )
+
+add_custom_command(TARGET fsni_test POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/r.zip
+        $<TARGET_FILE_DIR:fsni_test>/../
+        )
+        

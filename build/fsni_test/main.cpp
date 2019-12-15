@@ -4,7 +4,7 @@
 #define voidp void*
 
 extern "C" {
-    void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/);
+    void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*external storage path*/);
     void fsni_cleanup();
     voidp fsni_open(const char* fileName);
     int fsni_read(voidp fp, voidp buf, int size);
@@ -13,24 +13,27 @@ extern "C" {
     int fsni_getsize(voidp fp);
 }
 
-int main(int, char**) 
+static std::string fsni_get_file_content(const char* filename)
 {
     std::string content;
-    fsni_startup(R"(jar:file://D:\dev\projects\base.apk!/assets/)", "");
-
-    voidp fp = fsni_open("Main.lua");
+    voidp fp = fsni_open(filename);
     if (fp) {
-        content.resize(fsni_getsize(fp));
-        fsni_read(fp, &content.front(), content.size());
+        auto filesize = fsni_getsize(fp);
+        if (filesize > 0) {
+            content.resize(filesize);
+            fsni_read(fp, &content.front(), content.size());
+        }
         fsni_close(fp);
     }
+    return content;
+}
 
-    fp = fsni_open("extern.lua");
-    if (fp) {
-        content.resize(fsni_getsize(fp));
-        fsni_read(fp, &content.front(), content.size());
-        fsni_close(fp);
-    }
+int main(int, char**) 
+{
+    fsni_startup(R"(jar:file://r.zip!/assets/)", "");
+
+    std::string content1 = fsni_get_file_content("settings.xml");
+    std::string content2 = fsni_get_file_content("EditorKeyMap.lua");
 
     fsni_cleanup();
 
