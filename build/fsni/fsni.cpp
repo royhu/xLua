@@ -34,14 +34,8 @@ THE SOFTWARE.
 
 #define LUA_LIB
 
-#define MZ_2_9_1 0
-
 #include "fsni.h"
-#if !MZ_2_9_1
 #include "unzip.h"
-#else
-#include "mz_compat.h"
-#endif
 #include <unordered_map>
 #include <thread>
 #include <mutex>
@@ -90,8 +84,8 @@ THE SOFTWARE.
 
 struct ZipEntryInfo
 {
-    unz_file_pos pos;
-    uLong uncompressed_size;
+    unz64_file_pos pos;
+    uint64_t uncompressed_size;
 };
 
 class ZipFilePrivate
@@ -145,24 +139,14 @@ bool ZipFile::setFilter(const std::string& filter)
         // UNZ_MAXFILENAMEINZIP + 1 - it is done so in unzLocateFile
         char szCurrentFileName[UNZ_MAXFILENAMEINZIP + 1];
         unz_file_info64 fileInfo;
+        unz64_file_pos posInfo;
 
-#if !MZ_2_9_1
         // go through all files and store position information about the required files
         int err = unzGoToFirstFile64(m_data->zipFile, &fileInfo,
             szCurrentFileName, sizeof(szCurrentFileName) - 1);
-#else
-        int err = unzGoToFirstFile(m_data->zipFile);
-#endif
         while (err == UNZ_OK)
         {
-#if MZ_2_9_1
-            char extra[128];
-            unzGetCurrentFileInfo64(m_data->zipFile, &fileInfo, szCurrentFileName, sizeof(szCurrentFileName), extra,
-                sizeof(extra), NULL, -1);
-#endif
-            unz_file_pos posInfo;
-
-            int posErr = unzGetFilePos(m_data->zipFile, &posInfo);
+            int posErr = unzGetFilePos64(m_data->zipFile, &posInfo);
             if (posErr == UNZ_OK)
             {
                 // cache info about filtered files only (like 'assets/')
@@ -172,17 +156,14 @@ bool ZipFile::setFilter(const std::string& filter)
                 {
                     ZipEntryInfo entry;
                     entry.pos = posInfo;
-                    entry.uncompressed_size = (uLong)fileInfo.uncompressed_size;
+                    entry.uncompressed_size = fileInfo.uncompressed_size;
                     m_data->fileList[currentFileName.substr(filter.size()).data()] = entry;
                 }
             }
+
             // next file - also get the information about it
-#if !MZ_2_9_1
             err = unzGoToNextFile64(m_data->zipFile, &fileInfo,
                 szCurrentFileName, sizeof(szCurrentFileName) - 1);
-#else
-            err = unzGoToNextFile(m_data->zipFile);
-#endif
         }
         ret = true;
 
@@ -206,7 +187,11 @@ bool ZipFile::fileExists(const std::string& fileName) const
 
 // -------------------- fsni ---------------------
 
-
+#if defined(_WINDLL)
+#define FSNI_API __declspec(dllexport)
+#else
+#define FSNI_API
+#endif
 #define FSNI_INVALID_FILE_HANDLE -1
 #define APK_PREFIX "jar:file://"
 #define APK_PREFIX_LEN sizeof(APK_PREFIX)
@@ -218,14 +203,14 @@ struct fsni_stream {
         voidp entry;
         int fd;
     };
-    uLong offset;
+    int64_t offset;
     bool streaming; // whether in apk or obb file.
 };
 
 static yasio::gc::object_pool<fsni_stream, std::recursive_mutex> s_fsni_pool;
 
 extern "C" {
-    void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/)
+    FSNI_API void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/)
     {
         s_streamingPath = pszStreamingPath;
         s_persistPath = pszPersistPath;
@@ -250,7 +235,7 @@ extern "C" {
             }
         }
     }
-    void fsni_cleanup()
+    FSNI_API void fsni_cleanup()
     {
         s_streamingPath.clear();
         s_persistPath.clear();
@@ -260,7 +245,7 @@ extern "C" {
         }
     }
 
-    voidp fsni_open(const char* fileName)
+    FSNI_API voidp fsni_open(const char* fileName)
     {
         union {
             voidp entry;
@@ -302,7 +287,7 @@ extern "C" {
         return nullptr;
     }
 
-    int fsni_read(voidp fp, voidp buf, int size)
+    FSNI_API int fsni_read(voidp fp, voidp buf, int size)
     {
         fsni_stream* nfs = (fsni_stream*)fp;
         if (nfs != nullptr) {
@@ -321,13 +306,14 @@ extern "C" {
 
                     std::unique_lock<std::mutex> lck(shared_data->zipFileMtx);
 
-                    int nRet = unzGoToFilePos(shared_data->zipFile, &entry->pos);
+                    int nRet = unzGoToFilePos64(shared_data->zipFile, &entry->pos);
                     CC_BREAK_IF(UNZ_OK != nRet);
 
                     nRet = unzOpenCurrentFile(shared_data->zipFile);
 
-                    if (nfs->offset > 0)
-                        nRet = unzSeek64(shared_data->zipFile, nfs->offset, SEEK_SET);
+                    // Skip extra if necessary
+                    int extra_size = unzGetLocalExtrafield(shared_data->zipFile, nullptr, 0);
+                    nRet = unzSeek64(shared_data->zipFile, nfs->offset + extra_size, SEEK_SET);
                     n = unzReadCurrentFile(shared_data->zipFile, buf, size);
                     if (n > 0) {
                         nfs->offset += n;
@@ -344,7 +330,7 @@ extern "C" {
         return 0;
     }
 
-    int fsni_seek(voidp fp, int offset, int origin)
+    FSNI_API int fsni_seek(voidp fp, int offset, int origin)
     {
         fsni_stream* nfs = (fsni_stream*)fp;
         if (nfs != nullptr) {
@@ -384,7 +370,7 @@ extern "C" {
         return -1;
     }
 
-    void fsni_close(voidp fp)
+    FSNI_API void fsni_close(voidp fp)
     {
         fsni_stream* nfs = (fsni_stream*)fp;
         if (nfs != nullptr) {
@@ -396,7 +382,7 @@ extern "C" {
         }
     }
 
-    int fsni_getsize(voidp fp)
+    FSNI_API int fsni_getsize(voidp fp)
     {
         int size = fsni_seek(fp, 0, SEEK_END);
         fsni_seek(fp, 0, SEEK_SET);

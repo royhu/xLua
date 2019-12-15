@@ -1251,7 +1251,7 @@ extern int ZEXPORT unzOpenCurrentFile3(unzFile file, int *method, int *level, in
                 s->cur_file_info.dos_date >> 8 :
                 s->cur_file_info.crc >> 24;
             actual = (uint8_t)source[11];
-            if (expected != actual) {
+            if ((actual != 0) && (expected != actual)) {
               return UNZ_BADPASSWORD;
             }
 
@@ -1960,8 +1960,7 @@ extern int ZEXPORT unzSeek64(unzFile file, uint64_t offset, int origin)
         s->pfile_in_zip_read->stream.avail_in = 0;
         s->pfile_in_zip_read->stream.next_in = 0;
 
-        // s->pfile_in_zip_read->pos_in_zipfile = s->pfile_in_zip_read->offset_local_extrafield + position;
-        s->pfile_in_zip_read->pos_in_zipfile = s->pfile_in_zip_read->pos_in_zipfile + position;
+        s->pfile_in_zip_read->pos_in_zipfile = s->pfile_in_zip_read->offset_local_extrafield + position;
         s->pfile_in_zip_read->rest_read_compressed = s->cur_file_info.compressed_size - position;
     }
 

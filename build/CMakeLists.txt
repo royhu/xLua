@@ -108,6 +108,7 @@ set (THIRDPART_SRC ${THIRDPART_SRC} ${PBC_LUA_SRC})
 set (FSNI_SRC
     fsni/ioapi.c
     fsni/unzip.c
+    fsni/crypt.c
     fsni/fsni.cpp
 )
 set_property(
@@ -323,3 +324,8 @@ endif()
 
 ADD_SUBDIRECTORY(zlib EXCLUDE_FROM_ALL)
 target_link_libraries(xlua zlibstatic)
+
+if ( WIN32 )
+  add_subdirectory(fsni_test)
+  set_property(DIRECTORY PROPERTY VS_STARTUP_PROJECT "fsni_test")
+endif ( )
