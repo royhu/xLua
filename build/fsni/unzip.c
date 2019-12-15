@@ -1390,32 +1390,31 @@ extern int ZEXPORT unzReadCurrentFile(unzFile file, voidp buf, uint32_t len)
 
         if ((s->pfile_in_zip_read->compression_method == 0) || (s->pfile_in_zip_read->raw))
         {
-            uint32_t i = 0;
-            uint32_t count = 0;
+            uint32_t n = 0;
 
             if ((s->pfile_in_zip_read->stream.avail_in == 0) &&
                 (s->pfile_in_zip_read->rest_read_compressed == 0))
                 return (read == 0) ? UNZ_EOF : read;
 
             if (s->pfile_in_zip_read->stream.avail_out < s->pfile_in_zip_read->stream.avail_in)
-                count = s->pfile_in_zip_read->stream.avail_out;
+                n = s->pfile_in_zip_read->stream.avail_out;
             else
-                count = s->pfile_in_zip_read->stream.avail_in;
+                n = s->pfile_in_zip_read->stream.avail_in;
 
-            memcpy(s->pfile_in_zip_read->stream.next_out, s->pfile_in_zip_read->stream.next_in, count);
+            memcpy(s->pfile_in_zip_read->stream.next_out, s->pfile_in_zip_read->stream.next_in, n);
 
-            s->pfile_in_zip_read->total_out_64 = s->pfile_in_zip_read->total_out_64 + count;
-            s->pfile_in_zip_read->rest_read_uncompressed -= count;
+            s->pfile_in_zip_read->total_out_64 = s->pfile_in_zip_read->total_out_64 + n;
+            s->pfile_in_zip_read->rest_read_uncompressed -= n;
             s->pfile_in_zip_read->crc32 = (uint32_t)crc32(s->pfile_in_zip_read->crc32,
-                                s->pfile_in_zip_read->stream.next_out, count);
+                                s->pfile_in_zip_read->stream.next_out, n);
 
-            s->pfile_in_zip_read->stream.avail_in -= count;
-            s->pfile_in_zip_read->stream.avail_out -= count;
-            s->pfile_in_zip_read->stream.next_out += count;
-            s->pfile_in_zip_read->stream.next_in += count;
-            s->pfile_in_zip_read->stream.total_out += count;
+            s->pfile_in_zip_read->stream.avail_in -= n;
+            s->pfile_in_zip_read->stream.avail_out -= n;
+            s->pfile_in_zip_read->stream.next_out += n;
+            s->pfile_in_zip_read->stream.next_in += n;
+            s->pfile_in_zip_read->stream.total_out += n;
 
-            read += count;
+            read += n;
         }
         else if (s->pfile_in_zip_read->compression_method == Z_BZIP2ED)
         {
