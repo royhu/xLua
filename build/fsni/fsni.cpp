@@ -307,9 +307,7 @@ extern "C" {
 
                     nRet = unzOpenCurrentFile(shared_data->zipFile);
 
-                    // Skip extra if necessary
-                    int extra_size = unzGetLocalExtrafield(shared_data->zipFile, nullptr, 0);
-                    nRet = unzSeek64(shared_data->zipFile, nfs->offset + extra_size, SEEK_SET);
+                    nRet = unzSeek64(shared_data->zipFile, nfs->offset, SEEK_SET);
                     n = unzReadCurrentFile(shared_data->zipFile, buf, size);
                     if (n > 0) {
                         nfs->offset += n;
