@@ -25,7 +25,8 @@ option ( USING_LUAJIT "using luajit" OFF )
 option ( GC64 "using gc64" OFF )
 option ( LUAC_COMPATIBLE_FORMAT "compatible format" OFF )
 option ( LUA_COMPAT_MODULE "compat module" ON)
-option ( USING_LPB "using lpb instead protoc-gen-lua" OFF)
+option ( USING_LPB "using lpb instead protoc-gen-lua" ON)
+option ( XLUA_BUILD_WITH_CARES "build with c-ares support" ON)
 
 find_path(XLUA_PROJECT_DIR NAMES SConstruct
     PATHS 
@@ -136,6 +137,16 @@ set_property(
 list(APPEND THIRDPART_INC zlib ${CMAKE_CURRENT_BINARY_DIR}/zlib)
 set (THIRDPART_SRC ${THIRDPART_SRC} ${FSNI_SRC})
 #end fsni
+
+if (XLUA_BUILD_WITH_CARES)
+    #begin c-ares
+    set(CARES_STATIC ON CACHE BOOL "Build c-ares as static library" FORCE)
+    set(CARES_SHARED OFF CACHE BOOL "Build c-ares as shared library" FORCE)
+    set(CARES_BUILD_TOOLS OFF CACHE BOOL "Build c-ares tools" FORCE)
+    add_subdirectory(c-ares)
+    include_directories($<TARGET_FILE_DIR:c-ares>)
+    #end c-ares
+endif ()
 
 if (USING_LUAJIT)
 	
@@ -293,6 +304,13 @@ endif ()
 if (LUA_COMPAT_MODULE)
     target_compile_definitions (xlua PRIVATE LUA_COMPAT_MODULE)
 endif()
+
+if (XLUA_BUILD_WITH_CARES)
+    target_link_libraries(xlua c-ares)
+    target_compile_definitions (xlua PUBLIC YASIO_HAVE_CARES=1)
+endif ()
+
+target_compile_definitions (xlua PUBLIC YASIO_ENABLE_ARES_PROFILER=1)
 
 set_property(
 	SOURCE ${LUA_SOCKET}
