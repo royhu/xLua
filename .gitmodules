@@ -16,3 +16,6 @@
 [submodule "build/lua-protobuf"]
 	path = build/lua-protobuf
 	url = https://github.com/starwing/lua-protobuf
+[submodule "build/c-ares"]
+	path = build/c-ares
+	url = https://github.com/c-ares/c-ares
