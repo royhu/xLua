@@ -25,6 +25,7 @@ option ( USING_LUAJIT "using luajit" OFF )
 option ( GC64 "using gc64" OFF )
 option ( LUAC_COMPATIBLE_FORMAT "compatible format" OFF )
 option ( LUA_COMPAT_MODULE "compat module" ON)
+option ( USING_LPB "using lpb instead protoc-gen-lua" OFF)
 
 find_path(XLUA_PROJECT_DIR NAMES SConstruct
     PATHS 
@@ -92,17 +93,33 @@ list(APPEND THIRDPART_INC  lua-cjson)
 set (THIRDPART_SRC ${THIRDPART_SRC} ${LUACJSON_SRC})
 #end lua-cjson
 
-#pbc-lua
-set (PBC_LUA_SRC
-    protoc-gen-lua/protobuf/pb.c
-)
-set_property(
-    SOURCE ${PBC_LUA_SRC}
-    APPEND
-    PROPERTY COMPILE_DEFINITIONS
-)
-set (THIRDPART_SRC ${THIRDPART_SRC} ${PBC_LUA_SRC})
-#end pbc-lua
+if (NOT USING_LPB)
+    #pbc-lua
+    set (PBC_LUA_SRC
+        protoc-gen-lua/protobuf/pb.c
+    )
+    set_property(
+        SOURCE ${PBC_LUA_SRC}
+        APPEND
+        PROPERTY COMPILE_DEFINITIONS
+    )
+    set (THIRDPART_SRC ${THIRDPART_SRC} ${PBC_LUA_SRC})
+    #end pbc-lua
+else ()
+    #begin lua-profobuf
+    set (LPB_SRC 
+        lua-protobuf/pb.c
+    )
+    set_property(
+        SOURCE ${LPB_SRC}
+        APPEND
+        PROPERTY COMPILE_DEFINITIONS
+        LUA_LIB
+    )
+    list(APPEND THIRDPART_INC lua-protobuf)
+    set (THIRDPART_SRC ${THIRDPART_SRC} ${LPB_SRC})
+    #end lua-protobuf
+endif ()
 
 #fsni
 set (FSNI_SRC
