@@ -25,7 +25,7 @@ option ( USING_LUAJIT "using luajit" OFF )
 option ( GC64 "using gc64" OFF )
 option ( LUAC_COMPATIBLE_FORMAT "compatible format" OFF )
 option ( LUA_COMPAT_MODULE "compat module" ON)
-option ( USING_LPB "using lpb instead protoc-gen-lua" ON)
+option ( USING_LPB "using lpb instead protoc-gen-lua" OFF)
 option ( XLUA_BUILD_WITH_CARES "build with c-ares support" ON)
 
 find_path(XLUA_PROJECT_DIR NAMES SConstruct
