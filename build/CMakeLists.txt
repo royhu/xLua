@@ -143,6 +143,7 @@ if (XLUA_BUILD_WITH_CARES)
     set(CARES_STATIC ON CACHE BOOL "Build c-ares as static library" FORCE)
     set(CARES_SHARED OFF CACHE BOOL "Build c-ares as shared library" FORCE)
     set(CARES_BUILD_TOOLS OFF CACHE BOOL "Build c-ares tools" FORCE)
+    set(CARES_INSTALL OFF CACHE BOOL "Create installation targets (chain builders may want to disable this)" FORCE)
     add_subdirectory(c-ares)
     include_directories($<TARGET_FILE_DIR:c-ares>)
     #end c-ares
@@ -357,6 +358,11 @@ if (ANDROID AND ANDROID_STRIP_EXEC)
     )
 endif()
 
+# zlib
+set(ZLIB_BUILD_STATIC ON CACHE BOOL "Build zlib static library" FORCE)
+set(ZLIB_BUILD_SHARED OFF CACHE BOOL "Build zlib shared library" FORCE)
+set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "Build zlib examples" FORCE)
+set(ZLIB_INSTALL OFF CACHE BOOL "Create installation targets (chain builders may want to disable this)" FORCE)
 ADD_SUBDIRECTORY(zlib EXCLUDE_FROM_ALL)
 target_link_libraries(xlua zlibstatic)
 
