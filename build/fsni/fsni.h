@@ -114,6 +114,12 @@ extern "C" {
     FSNI_API int fsni_seek(voidp fp, int offset, int origin);
     FSNI_API void fsni_close(voidp fp);
     FSNI_API int fsni_getsize(voidp fp);
+    FSNI_API int fsni_remove(const char* path);
+    FSNI_API int fsni_rename(const char* oldName, const char* newName);
+    /*
+    @flags: 1: check file exists, 2: check directory exists£¬ 3£º check file or directory exists
+    */
+    FSNI_API bool fsni_exists(const char* path, int flags);
     FSNI_API void fsni_cleanup();
 }
 

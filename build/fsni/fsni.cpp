@@ -59,6 +59,7 @@ THE SOFTWARE.
 #define posix_write ::_write
 #include <io.h>
 #include <fcntl.h>
+#include <Windows.h>
 #else
 #define O_READ_FLAGS O_RDONLY, S_IRUSR
 #define O_WRITE_FLAGS O_CREAT | O_RDWR, S_IRWXU
@@ -381,5 +382,42 @@ extern "C" {
         int size = fsni_seek(fp, 0, SEEK_END);
         fsni_seek(fp, 0, SEEK_SET);
         return size;
+    }
+
+    int fsni_remove(const char* path)
+    {
+        return ::remove(path);
+    }
+    int fsni_rename(const char* oldName, const char* newName)
+    {
+        return ::rename(oldName, newName);
+    }
+    bool fsni_exists(const char* path, int flags)
+    {
+        bool found = false;
+#if defined(_WIN32)
+        DWORD attr = GetFileAttributesA(path);
+        if (attr != INVALID_FILE_ATTRIBUTES) {
+            if(flags & 1)
+                found = !(attr & FILE_ATTRIBUTE_DIRECTORY);
+            if (flags & 2)
+                found = (attr & FILE_ATTRIBUTE_DIRECTORY);
+        }
+#else
+        struct stat st;
+        if (::stat(path, &st) == 0)
+        {
+            if(flags & 1)
+                found = S_ISREG(st.st_mode);
+            if(flags & 2)
+                found = S_ISDIR(st.st_mode);;
+        }
+#endif
+        // check android, from apk
+        if (!found && s_zipFile != nullptr) {
+           found = (s_zipFile->m_data->fileList.find(path) != s_zipFile->m_data->fileList.end());
+        }
+
+        return found;
     }
 }
