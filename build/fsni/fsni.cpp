@@ -251,11 +251,15 @@ extern "C" {
             int fd;
         };
 
+        int error = 0;
+
         // try open from hot update path disk
         std::string fullPath = s_persistPath + fileName;
         fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
         bool streaming = false;
         if (fd == FSNI_INVALID_FILE_HANDLE) {
+            error = errno;
+
             // try open from internal path
             if (s_zipFile != nullptr) { // android, from apk
                 auto it = s_zipFile->m_data->fileList.find(fileName);
@@ -263,10 +267,13 @@ extern "C" {
                     entry = &it->second;
                     streaming = true;
                 }
+                else error = ENOENT;
             }
             else { // ios, from disk
                 fullPath = s_streamingPath + fileName;
                 fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
+                if (fd == -1)
+                    error = errno;
             }
         }
 
@@ -278,9 +285,10 @@ extern "C" {
                 f->streaming = streaming;
                 return f;
             }
+            else error = ENOMEM;
         }
 
-        FSNI_LOGE("fsni_open ----> %s failed!", fileName);
+        FSNI_LOGE("fsni_open ----> %s failed, error:%d, detail:%s!", fileName, error, strerror(error));
         return nullptr;
     }
 
