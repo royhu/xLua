@@ -24,6 +24,8 @@ THE SOFTWARE.
 #ifndef _FSNI_H_
 #define _FSNI_H_
 
+#define FSNI_VER "1.1.968"
+
 #if defined(_WINDLL)
 #  if defined(LUA_LIB)
 #    define FSNI_API __declspec(dllexport)

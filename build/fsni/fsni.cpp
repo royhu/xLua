@@ -24,8 +24,7 @@ THE SOFTWARE.
 #include <zlib.h>
 #include <assert.h>
 #include <stdlib.h>
-
-#define FSNI_VER "1.0.967"
+#include <ctype.h>
 
 #if defined(__ANDROID__)
 #include <android/log.h>
