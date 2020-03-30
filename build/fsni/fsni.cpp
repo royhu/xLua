@@ -25,12 +25,12 @@ THE SOFTWARE.
 #include <assert.h>
 #include <stdlib.h>
 
-#define FSNI_VER "1.0.961"
+#define FSNI_VER "1.0.962"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
-#define FSNI_LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,"FSNI",__VA_ARGS__)
-#define FSNI_LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,"FSNI",__VA_ARGS__)
+#define FSNI_LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,"FSNI-" FSNI_VER,__VA_ARGS__)
+#define FSNI_LOGE(...)  __android_log_print(ANDROID_LOG_ERROR,"FSNI-" FSNI_VER,__VA_ARGS__)
 #else
 #define FSNI_LOGD(...)
 #define FSNI_LOGE(...)
@@ -63,7 +63,7 @@ THE SOFTWARE.
 #include <fcntl.h>
 #include <Windows.h>
 #else
-#define O_READ_FLAGS O_RDONLY, S_IRUSR
+#define O_READ_FLAGS O_RDONLY, S_IRUSR | S_IRGRP | S_IROTH
 #define O_WRITE_FLAGS O_CREAT | O_RDWR, S_IRWXU
 #define O_APPEND_FLAGS O_APPEND | O_CREAT | O_RDWR, S_IRWXU
 #define posix_open ::open
