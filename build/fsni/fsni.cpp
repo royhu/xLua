@@ -63,7 +63,8 @@ THE SOFTWARE.
 #include <fcntl.h>
 #include <Windows.h>
 #else
-#define O_READ_FLAGS O_RDONLY, S_IRUSR | S_IRGRP | S_IROTH
+// S_IRUSR | S_IRGRP | S_IROTH
+#define O_READ_FLAGS O_RDONLY, S_IRUSR
 #define O_WRITE_FLAGS O_CREAT | O_RDWR, S_IRWXU
 #define O_APPEND_FLAGS O_APPEND | O_CREAT | O_RDWR, S_IRWXU
 #define posix_open ::open
@@ -215,6 +216,18 @@ struct fsni_stream {
 static yasio::gc::object_pool<fsni_stream, std::recursive_mutex> s_fsni_pool;
 
 extern "C" {
+    struct fsni_mode {
+        enum {
+            read,
+            write,
+            append,
+        };
+    };
+    static const int s_fsni_flags[][2] = {
+        O_READ_FLAGS,
+        O_WRITE_FLAGS,
+        O_APPEND_FLAGS,
+    };
     FSNI_API void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/)
     {
         s_streamingPath = pszStreamingPath;
@@ -246,7 +259,7 @@ extern "C" {
         }
     }
 
-    FSNI_API voidp fsni_open(const char* fileName)
+    FSNI_API voidp fsni_open(const char* fileName, int mode)
     {
         union {
             voidp entry;
@@ -257,25 +270,27 @@ extern "C" {
 
         // try open from hot update path disk
         std::string fullPath = s_persistPath + fileName;
-        fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
+        auto flags = s_fsni_flags[mode];
+        fd = posix_open(fullPath.c_str(), flags[0], flags[1]);
         bool streaming = false;
         if (fd == FSNI_INVALID_FILE_HANDLE) {
             internalError = errno;
-
-            // try open from internal path
-            if (s_zipFile != nullptr) { // android, from apk
-                auto it = s_zipFile->m_data->fileList.find(fileName);
-                if (it != s_zipFile->m_data->fileList.end()) {
-                    entry = &it->second;
-                    streaming = true;
+            if (flags[0] == s_fsni_flags[fsni_mode::read][0]) { // only readonly, we can try to read from app internal path
+                // try open from internal path
+                if (s_zipFile != nullptr) { // android, from apk
+                    auto it = s_zipFile->m_data->fileList.find(fileName);
+                    if (it != s_zipFile->m_data->fileList.end()) {
+                        entry = &it->second;
+                        streaming = true;
+                    }
+                    else error = ENOENT;
                 }
-                else error = ENOENT;
-            }
-            else { // ios, from disk
-                fullPath = s_streamingPath + fileName;
-                fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
-                if (fd == -1)
-                    internalError = errno;
+                else { // ios, from disk
+                    fullPath = s_streamingPath + fileName;
+                    fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
+                    if (fd == -1)
+                        internalError = errno;
+                }
             }
         }
 
@@ -334,6 +349,15 @@ extern "C" {
             }
         }
 
+        return 0;
+    }
+
+    FSNI_API int fsni_write(voidp fp, voidp buf, int size) {
+        fsni_stream* nfs = (fsni_stream*)fp;
+        if (nfs != nullptr && !nfs->streaming && nfs->fd != FSNI_INVALID_FILE_HANDLE) 
+        { // for write mode, must always writeable path
+            return posix_write(nfs->fd, buf, size);
+        }
         return 0;
     }
 

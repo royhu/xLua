@@ -109,8 +109,14 @@ public static extern void fsni_cleanup();
 */
 extern "C" {
     FSNI_API void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/);
-    FSNI_API voidp fsni_open(const char* path);
+    /*
+    @params:
+      path: path of file
+      mode: 0: read, 1: write, 2: append
+    */
+    FSNI_API voidp fsni_open(const char* path, int mode);
     FSNI_API int fsni_read(voidp fp, voidp buf, int size); // DLLimport( nt fsni_read(voidp fp, byte[] buf, int size)
+    FSNI_API int fsni_write(voidp fp, voidp buf, int size);
     FSNI_API int fsni_seek(voidp fp, int offset, int origin);
     FSNI_API void fsni_close(voidp fp);
     FSNI_API int fsni_getsize(voidp fp);
