@@ -25,6 +25,8 @@ THE SOFTWARE.
 #include <assert.h>
 #include <stdlib.h>
 
+#define FSNI_VER "1.0.961"
+
 #if defined(__ANDROID__)
 #include <android/log.h>
 #define FSNI_LOGD(...)  __android_log_print(ANDROID_LOG_DEBUG,"FSNI",__VA_ARGS__)
@@ -251,14 +253,14 @@ extern "C" {
             int fd;
         };
 
-        int error = 0;
+        int internalError = 0, error = 0;
 
         // try open from hot update path disk
         std::string fullPath = s_persistPath + fileName;
         fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
         bool streaming = false;
         if (fd == FSNI_INVALID_FILE_HANDLE) {
-            error = errno;
+            internalError = errno;
 
             // try open from internal path
             if (s_zipFile != nullptr) { // android, from apk
@@ -273,7 +275,7 @@ extern "C" {
                 fullPath = s_streamingPath + fileName;
                 fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
                 if (fd == -1)
-                    error = errno;
+                    internalError = errno;
             }
         }
 
@@ -288,7 +290,9 @@ extern "C" {
             else error = ENOMEM;
         }
 
-        FSNI_LOGE("fsni_open ----> %s failed, error:%d, detail:%s!", fileName, error, strerror(error));
+        FSNI_LOGE("fsni_open ----> %s failed, internalError:%d(%s), error:%d(%s)!", fileName,
+            internalError, strerror(internalError),
+            error, strerror(error));
         return nullptr;
     }
 
@@ -406,7 +410,7 @@ extern "C" {
 #if defined(_WIN32)
         DWORD attr = GetFileAttributesA(path);
         if (attr != INVALID_FILE_ATTRIBUTES) {
-            if(flags & 1)
+            if (flags & 1)
                 found = !(attr & FILE_ATTRIBUTE_DIRECTORY);
             if (flags & 2)
                 found = (attr & FILE_ATTRIBUTE_DIRECTORY);
@@ -415,15 +419,15 @@ extern "C" {
         struct stat st;
         if (::stat(path, &st) == 0)
         {
-            if(flags & 1)
+            if (flags & 1)
                 found = S_ISREG(st.st_mode);
-            if(flags & 2)
+            if (flags & 2)
                 found = S_ISDIR(st.st_mode);;
         }
 #endif
         // check android, from apk
         if (!found && s_zipFile != nullptr) {
-           found = (s_zipFile->m_data->fileList.find(path) != s_zipFile->m_data->fileList.end());
+            found = (s_zipFile->m_data->fileList.find(path) != s_zipFile->m_data->fileList.end());
         }
 
         return found;
