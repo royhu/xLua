@@ -25,7 +25,7 @@ THE SOFTWARE.
 #include <assert.h>
 #include <stdlib.h>
 
-#define FSNI_VER "1.0.962"
+#define FSNI_VER "1.0.964"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -352,7 +352,7 @@ extern "C" {
         return 0;
     }
 
-    FSNI_API int fsni_write(voidp fp, voidp buf, int size) {
+    FSNI_API int fsni_write(voidp fp, const voidp buf, int size) {
         fsni_stream* nfs = (fsni_stream*)fp;
         if (nfs != nullptr && !nfs->streaming && nfs->fd != FSNI_INVALID_FILE_HANDLE) 
         { // for write mode, must always writeable path

@@ -116,7 +116,7 @@ extern "C" {
     */
     FSNI_API voidp fsni_open(const char* path, int mode);
     FSNI_API int fsni_read(voidp fp, voidp buf, int size); // DLLimport( nt fsni_read(voidp fp, byte[] buf, int size)
-    FSNI_API int fsni_write(voidp fp, voidp buf, int size);
+    FSNI_API int fsni_write(voidp fp, const voidp buf, int size);
     FSNI_API int fsni_seek(voidp fp, int offset, int origin);
     FSNI_API void fsni_close(voidp fp);
     FSNI_API int fsni_getsize(voidp fp);
