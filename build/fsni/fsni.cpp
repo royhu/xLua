@@ -25,7 +25,7 @@ THE SOFTWARE.
 #include <assert.h>
 #include <stdlib.h>
 
-#define FSNI_VER "1.0.966"
+#define FSNI_VER "1.0.967"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -216,13 +216,6 @@ struct fsni_stream {
 
 static yasio::gc::object_pool<fsni_stream, std::recursive_mutex> s_fsni_pool;
 
-namespace fsni_mode {
-    enum {
-        read,
-        write,
-        append,
-    };
-};
 static const int s_fsni_flags[][2] = {
     O_READ_FLAGS,
     O_WRITE_FLAGS,
@@ -327,12 +320,18 @@ extern "C" {
 
         int internalError = 0, error = 0;
 
+        bool absolute = (fileName[0] == '/' || (isalpha(fileName[0]) && fileName[1] == ':'));
+
         // try open from hot update path disk
-        std::string fullPath = s_persistPath + fileName;
+        std::string fullPath;
+        if (!absolute)
+            s_persistPath + fileName;
+        else
+            fullPath = fileName;
         auto flags = s_fsni_flags[mode];
 
         bool readonly = flags[0] == s_fsni_flags[fsni_mode::read][0];
-        if (!readonly) {
+        if (!readonly) { // try make file's parent directory
             auto slash = fullPath.find_last_of(R"(/\)");
             if (slash != std::string::npos) {
                 auto chTmp = fullPath[slash]; // store
@@ -347,7 +346,7 @@ extern "C" {
         bool streaming = false;
         if (fd == FSNI_INVALID_FILE_HANDLE) {
             internalError = errno;
-            if (readonly) { // only readonly, we can try to read from app internal path
+            if (readonly && !absolute) { // only readonly and not absolute path, we can try to read from app internal path
                 // try open from internal path
                 if (s_zipFile != nullptr) { // android, from apk
                     auto it = s_zipFile->m_data->fileList.find(fileName);
@@ -377,7 +376,7 @@ extern "C" {
             else error = ENOMEM;
         }
 
-        FSNI_LOGE("fsni_open ----> %s failed, internalError:%d(%s), error:%d(%s)!", fileName,
+        FSNI_LOGE("fsni_open ----> %s failed, internalError:%d(%s), error:%d(%s)!", fullPath.c_str(),
             internalError, strerror(internalError),
             error, strerror(error));
         return nullptr;

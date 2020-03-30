@@ -113,6 +113,14 @@ namespace fsni_chkflags {
         directory = 1 << 1,
     };
 }
+namespace fsni_mode {
+    enum {
+        read,
+        write,
+        append,
+    };
+};
+
 extern "C" {
     FSNI_API void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/);
     /*
