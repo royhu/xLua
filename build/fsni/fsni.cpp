@@ -25,7 +25,7 @@ THE SOFTWARE.
 #include <assert.h>
 #include <stdlib.h>
 
-#define FSNI_VER "1.0.964"
+#define FSNI_VER "1.0.965"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -215,19 +215,20 @@ struct fsni_stream {
 
 static yasio::gc::object_pool<fsni_stream, std::recursive_mutex> s_fsni_pool;
 
+namespace fsni_mode {
+    enum {
+        read,
+        write,
+        append,
+    };
+};
+static const int s_fsni_flags[][2] = {
+    O_READ_FLAGS,
+    O_WRITE_FLAGS,
+    O_APPEND_FLAGS,
+};
+
 extern "C" {
-    struct fsni_mode {
-        enum {
-            read,
-            write,
-            append,
-        };
-    };
-    static const int s_fsni_flags[][2] = {
-        O_READ_FLAGS,
-        O_WRITE_FLAGS,
-        O_APPEND_FLAGS,
-    };
     FSNI_API void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/)
     {
         s_streamingPath = pszStreamingPath;
