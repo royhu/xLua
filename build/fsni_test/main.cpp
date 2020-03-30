@@ -36,7 +36,7 @@ int main(int, char**)
     std::string content1 = fsni_get_file_content("settings.xml");
     std::string content2 = fsni_get_file_content("EditorKeyMap.lua");
 
-    auto fp = fsni_open("r1.zip", 1);
+    auto fp = fsni_open("a/b/c/r1.zip", 1);
     if (fp) {
         fsni_write(fp, content0.c_str(), content0.size());
         fsni_close(fp);

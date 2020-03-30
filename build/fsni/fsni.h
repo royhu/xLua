@@ -107,6 +107,12 @@ public static extern int fsni_getsize(IntPtr fp);
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
 public static extern void fsni_cleanup();
 */
+namespace fsni_chkflags {
+    enum {
+        file = 1,
+        directory = 1 << 1,
+    };
+}
 extern "C" {
     FSNI_API void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/);
     /*
@@ -124,6 +130,7 @@ extern "C" {
     FSNI_API int fsni_rename(const char* oldName, const char* newName);
     /*
     @flags: 1: check file exists, 2: check directory exists£¬ 3£º check file or directory exists
+    @see: fsni_chkflags
     */
     FSNI_API bool fsni_exists(const char* path, int flags);
     FSNI_API void fsni_cleanup();

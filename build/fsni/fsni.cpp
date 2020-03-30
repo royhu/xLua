@@ -25,7 +25,7 @@ THE SOFTWARE.
 #include <assert.h>
 #include <stdlib.h>
 
-#define FSNI_VER "1.0.965"
+#define FSNI_VER "1.0.966"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -62,6 +62,7 @@ THE SOFTWARE.
 #include <io.h>
 #include <fcntl.h>
 #include <Windows.h>
+#include <direct.h>
 #else
 // S_IRUSR | S_IRGRP | S_IROTH
 #define O_READ_FLAGS O_RDONLY, S_IRUSR
@@ -228,6 +229,63 @@ static const int s_fsni_flags[][2] = {
     O_APPEND_FLAGS,
 };
 
+// helper methods
+template<typename _Elem, typename _Pr, typename _Fn> inline
+void _fsni_splitpath(_Elem* s, _Pr _Pred, _Fn func) // will convert '\\' to '/'
+{
+    _Elem* _Start = s; // the start of every string
+    _Elem* _Ptr = s;   // source string iterator
+    while (_Pred(_Ptr))
+    {
+        if ('\\' == *_Ptr || '/' == *_Ptr)
+        {
+            if (_Ptr != _Start) {
+                auto _Ch = *_Ptr;
+                *_Ptr = '\0';
+                bool should_brk = func(s);
+#if defined(_WIN32)
+                *_Ptr = '\\';
+#else // For unix linux like system.
+                * _Ptr = '/';
+#endif
+                if (should_brk)
+                    return;
+            }
+            _Start = _Ptr + 1;
+        }
+        ++_Ptr;
+    }
+    if (_Start < _Ptr) {
+        func(s);
+    }
+}
+
+template<typename _Elem, typename _Fn> inline
+void fsni_splitpath(_Elem* s, _Fn func) // will convert '\\' to '/'
+{
+    _fsni_splitpath(s, [=](_Elem* _Ptr) {return *_Ptr != '\0'; }, func);
+}
+
+static void fsni_mkdir(std::string dir)
+{
+    if (dir.empty()) return;
+
+    fsni_splitpath(&dir.front(), [](const char* subdir) {
+        bool should_brk = false;
+
+        if (!fsni_exists(subdir, fsni_chkflags::directory))
+        {
+#ifdef _WIN32
+            should_brk = !(0 == ::mkdir(subdir));
+#else
+            should_brk = !(0 == ::mkdir(subdir, S_IRWXU | S_IRWXG | S_IRWXO));
+#endif
+        }
+
+        return should_brk;
+        });
+}
+
 extern "C" {
     FSNI_API void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/)
     {
@@ -272,11 +330,24 @@ extern "C" {
         // try open from hot update path disk
         std::string fullPath = s_persistPath + fileName;
         auto flags = s_fsni_flags[mode];
+
+        bool readonly = flags[0] == s_fsni_flags[fsni_mode::read][0];
+        if (!readonly) {
+            auto slash = fullPath.find_last_of(R"(/\)");
+            if (slash != std::string::npos) {
+                auto chTmp = fullPath[slash]; // store
+                fullPath[slash] = '\0';
+                if (!fsni_exists(fullPath.c_str(), fsni_chkflags::directory))
+                    fsni_mkdir(fullPath.substr(0, slash));
+                fullPath[slash] = chTmp; // restore
+            }
+        }
+
         fd = posix_open(fullPath.c_str(), flags[0], flags[1]);
         bool streaming = false;
         if (fd == FSNI_INVALID_FILE_HANDLE) {
             internalError = errno;
-            if (flags[0] == s_fsni_flags[fsni_mode::read][0]) { // only readonly, we can try to read from app internal path
+            if (readonly) { // only readonly, we can try to read from app internal path
                 // try open from internal path
                 if (s_zipFile != nullptr) { // android, from apk
                     auto it = s_zipFile->m_data->fileList.find(fileName);
@@ -355,7 +426,7 @@ extern "C" {
 
     FSNI_API int fsni_write(voidp fp, const voidp buf, int size) {
         fsni_stream* nfs = (fsni_stream*)fp;
-        if (nfs != nullptr && !nfs->streaming && nfs->fd != FSNI_INVALID_FILE_HANDLE) 
+        if (nfs != nullptr && !nfs->streaming && nfs->fd != FSNI_INVALID_FILE_HANDLE)
         { // for write mode, must always writeable path
             return posix_write(nfs->fd, buf, size);
         }
