@@ -138,6 +138,15 @@ extern "C" {
     FSNI_API int fsni_getsize(voidp fp);
     FSNI_API int fsni_remove(const char* path);
     FSNI_API int fsni_rename(const char* oldName, const char* newName);
+
+    /* ------------ native memory operations ------------- */
+    FSNI_API voidp fsni_alloc(int size);
+    FSNI_API void fsni_free(voidp);
+
+    FSNI_API voidp fsni_strdup(const char* s);
+    FSNI_API voidp fsni_strndup(const char* s, int len);
+    FSNI_API voidp fsni_memdup(const voidp p, int size);
+
     /*
     @flags: 1: check file exists, 2: check directory exists£¬ 3£º check file or directory exists
     @see: fsni_chkflags

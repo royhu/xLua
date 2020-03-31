@@ -526,4 +526,40 @@ extern "C" {
 
         return found;
     }
+
+    FSNI_API voidp fsni_alloc(int size) {
+        return malloc(size);
+    }
+
+    FSNI_API void fsni_free(voidp ptr) {
+        if (ptr)
+            free(ptr);
+    }
+
+    FSNI_API voidp fsni_strdup(const char* s)
+    {
+        auto len = strlen(s);
+        auto dup = (char*)fsni_alloc(len + 1);
+        if (dup) {
+            memcpy(dup, s, len);
+            dup[len] = '\0';
+        }
+        return dup;
+    }
+    FSNI_API voidp fsni_strndup(const char* s, int len)
+    {
+        auto dup = (char*)fsni_alloc(len + 1);
+        if (dup) {
+            memcpy(dup, s, len);
+            dup[len] = '\0';
+        }
+        return dup;
+    }
+    FSNI_API voidp fsni_memdup(const voidp p, int size)
+    {
+        voidp dup = fsni_alloc(size);
+        if (dup)
+            memcpy(dup, p, size);
+        return dup;
+    }
 }
