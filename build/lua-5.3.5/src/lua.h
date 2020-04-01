@@ -11,7 +11,7 @@
 
 #include <stdarg.h>
 #include <stddef.h>
-
+#include <stdint.h>
 
 #include "luaconf.h"
 
@@ -98,6 +98,12 @@ typedef LUA_UNSIGNED lua_Unsigned;
 /* type for continuation-function contexts */
 typedef LUA_KCONTEXT lua_KContext;
 
+/* type of 64bit VM can load 32 bit byte code */
+#if defined(LUAC_COMPAT_32BIT)
+#define LBC_SIZE_T uint32_t
+#else
+#define LBC_SIZE_T size_t
+#endif
 
 /*
 ** Type for C functions registered with Lua
