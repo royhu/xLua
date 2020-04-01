@@ -190,8 +190,10 @@ static void DumpHeader (DumpState *D) {
   DumpByte(LUAC_VERSION, D);
   DumpByte(LUAC_FORMAT, D);
   DumpLiteral(LUAC_DATA, D);
+#if  LUAC_COMPAT_32BIT
   DumpByte(sizeof(int), D);
   DumpByte(sizeof(LBC_SIZE_T), D);
+#endif
   DumpByte(sizeof(Instruction), D);
   DumpByte(sizeof(lua_Integer), D);
   DumpByte(sizeof(lua_Number), D);

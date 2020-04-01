@@ -240,8 +240,10 @@ static void checkHeader (LoadState *S) {
   if (LoadByte(S) != LUAC_FORMAT)
     error(S, "format mismatch in");
   checkliteral(S, LUAC_DATA, "corrupted");
+#if LUAC_COMPAT_32BIT
   checksize(S, int);
   checksize(S, LBC_SIZE_T);
+#endif
   checksize(S, Instruction);
   checksize(S, lua_Integer);
   checksize(S, lua_Number);
