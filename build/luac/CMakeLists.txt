@@ -15,6 +15,9 @@ endif ()
 
 project(luac)
 
+option ( LUAC_COMPAT_FORMAT "compatible byte code format" ON )
+option ( LUAC_COMPAT_32BIT "compatible official 32bit byte code format" ON )
+
 
 find_path(LUAC_PROJECT_DIR NAMES SConstruct
     PATHS 
@@ -70,8 +73,13 @@ source_group_by_dir(${CMAKE_CURRENT_SOURCE_DIR} LUAC)
 add_executable (luac ${LUA_CORE} ${LUA_LIB} ${LUAC})
 add_executable (lua ${LUA_CORE} ${LUA_LIB} ${LUA})
 
-if (LUAC_COMPATIBLE_FORMAT)
-target_compile_definitions (luac PRIVATE LUAC_COMPATIBLE_FORMAT)
-target_compile_definitions (lua PRIVATE LUAC_COMPATIBLE_FORMAT)
+if (LUAC_COMPAT_FORMAT)
+target_compile_definitions (luac PRIVATE LUAC_COMPAT_FORMAT)
+target_compile_definitions (lua PRIVATE LUAC_COMPAT_FORMAT)
+endif ()
+
+if (LUAC_COMPAT_32BIT)
+target_compile_definitions (luac PRIVATE LUAC_COMPAT_32BIT)
+target_compile_definitions (lua PRIVATE LUAC_COMPAT_32BIT)
 endif ()
 
