@@ -536,15 +536,21 @@ extern "C" {
             free(ptr);
     }
 
-    FSNI_API voidp fsni_strdup(const char* s)
+    FSNI_API voidp fsni_strdup(const char* s, int* len)
     {
-        auto len = strlen(s);
-        auto dup = (char*)fsni_alloc(len + 1);
+        auto n = strlen(s);
+        auto dup = (char*)fsni_alloc(n + 1);
         if (dup) {
-            memcpy(dup, s, len);
-            dup[len] = '\0';
+            memcpy(dup, s, n);
+            dup[n] = '\0';
         }
+        if (len)
+            *len = n;
         return dup;
+    }
+    FSNI_API int fsni_strlen(const char* s)
+    {
+        return strlen(s);
     }
     FSNI_API voidp fsni_strndup(const char* s, int len)
     {

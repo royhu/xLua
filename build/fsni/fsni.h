@@ -24,7 +24,7 @@ THE SOFTWARE.
 #ifndef _FSNI_H_
 #define _FSNI_H_
 
-#define FSNI_VER "1.1.0"
+#define FSNI_VER "1.1.1"
 
 #if defined(_WINDLL)
 #  if defined(LUA_LIB)
@@ -143,7 +143,9 @@ extern "C" {
     FSNI_API voidp fsni_alloc(int size);
     FSNI_API void fsni_free(voidp);
 
-    FSNI_API voidp fsni_strdup(const char* s);
+    // pitfall: C# string.Length not real utf8 string bytes.
+    FSNI_API voidp fsni_strdup(const char* s, int* len);
+    FSNI_API int fsni_strlen(const char* s);
     FSNI_API voidp fsni_strndup(const char* s, int len);
     FSNI_API voidp fsni_memdup(const voidp p, int size);
 
