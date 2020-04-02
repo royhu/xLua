@@ -284,6 +284,8 @@ extern "C" {
         s_streamingPath = pszStreamingPath;
         s_persistPath = pszPersistPath;
 
+        FSNI_LOGD("fsni_startup ---> streamingPath:%s, persistPath:%s", s_streamingPath.c_str(), s_persistPath.c_str());
+
         if (cxx20::starts_with(cxx17::string_view(s_streamingPath), APK_PREFIX))
         { // Android streamingPath format: jar:file://${APK_PATH}!/assets/
             // [FSNI] Init, streamingAssetsPath: jar:file:///data/app/com.c4games.redalert3d-TBAXBO37ccSyzWzUsJwcHQ==/base.apk!/assets
