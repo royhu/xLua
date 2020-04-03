@@ -24,7 +24,7 @@ THE SOFTWARE.
 #ifndef _FSNI_H_
 #define _FSNI_H_
 
-#define FSNI_VER "1.1.1"
+#define FSNI_VER "1.1.2"
 
 #if defined(_WINDLL)
 #  if defined(LUA_LIB)
@@ -36,60 +36,7 @@ THE SOFTWARE.
 #  define FSNI_API
 #endif
 
-#include <string>
-
-// forward declaration
-class ZipFilePrivate;
-/**
-* Zip file - reader helper class.
-*
-* It will cache the file list of a particular zip file with positions inside an archive,
-* so it would be much faster to read some particular files or to check their existance.
-*
-* @since v2.0.5
-*/
-class ZipFile
-{
-public:
-    /**
-    * Constructor, open zip file and store file list.
-    *
-    * @param zipFile Zip file name
-    * @param filter The first part of file names, which should be accessible.
-    *               For example, "assets/". Other files will be missed.
-    *
-    * @since v2.0.5
-    */
-    ZipFile(const std::string& zipFile, const std::string& filter = std::string());
-    virtual ~ZipFile();
-
-    bool isOpen() const;
-
-    /**
-    * Regenerate accessible file list based on a new filter string.
-    *
-    * @param filter New filter string (first part of files names)
-    * @return true whenever zip file is open successfully and it is possible to locate
-    *              at least the first file, false otherwise
-    *
-    * @since v2.0.5
-    */
-    bool setFilter(const std::string& filter);
-
-    /**
-    * Check does a file exists or not in zip file
-    *
-    * @param fileName File to be checked on existance
-    * @return true whenever file exists, false otherwise
-    *
-    * @since v2.0.5
-    */
-    bool fileExists(const std::string& fileName) const;
-
-public:
-    /** Internal data like zip file pointer / file list array and so on */
-    ZipFilePrivate* m_data;
-};
+#define voidp void*
 
 /*
 The File Stream Native Interface
@@ -148,6 +95,14 @@ extern "C" {
     FSNI_API int fsni_strlen(const char* s);
     FSNI_API voidp fsni_strndup(const char* s, int len);
     FSNI_API voidp fsni_memdup(const voidp p, int size);
+
+    // safe save file data
+    FSNI_API int fsni_write_all_safe(const char* fullPath, voidp data, int size);
+
+    FSNI_API voidp fsni_open_safe(const char* fileName, int mode);
+    FSNI_API int fsni_read_safe(voidp fp, voidp buf, int size);
+    FSNI_API int fsni_write_safe(voidp fp, voidp data, int size);
+    FSNI_API void fsni_close_safe(voidp fp);
 
     /*
     @flags: 1: check file exists, 2: check directory exists£¬ 3£º check file or directory exists

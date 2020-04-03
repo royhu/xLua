@@ -1,30 +1,24 @@
-/****************************************************************************
-Copyright (c) 2010 cocos2d-x.org
+#define LUA_LIB
 
-http://www.cocos2d-x.org
+#include "fsni.h"
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
-****************************************************************************/
-#include <zlib.h>
 #include <assert.h>
 #include <stdlib.h>
 #include <ctype.h>
+
+#include <unordered_map>
+#include <thread>
+#include <mutex>
+
+// memcpy
+#include <string.h>
+
+#include "aes.h"
+
+#include "yasio/cxx17/string_view.hpp"
+#include "yasio/detail/object_pool.hpp"
+
+#include "ZipFile.h"
 
 #if defined(__ANDROID__)
 #include <android/log.h>
@@ -34,20 +28,6 @@ THE SOFTWARE.
 #define FSNI_LOGD(...)
 #define FSNI_LOGE(...)
 #endif
-
-#define LUA_LIB
-
-#include "fsni.h"
-#include "unzip.h"
-#include <unordered_map>
-#include <thread>
-#include <mutex>
-
-// memcpy
-#include <string.h>
-
-#include "yasio/cxx17/string_view.hpp"
-#include "yasio/detail/object_pool.hpp"
 
 #if defined(_WIN32)
 #define O_READ_FLAGS O_BINARY | O_RDONLY, S_IREAD
@@ -77,122 +57,6 @@ THE SOFTWARE.
 #include <fcntl.h>
 #endif
 
-#define CC_BREAK_IF(cond) if(cond) break
-#define CC_UNUSED
-
-// MINIZIP v1.2 no unzGoToFirstFile64, unzGoToNextFile64
-#define unzGoToFirstFile64(A,B,C,D) unzGoToFirstFile2(A,B,C,D, NULL, 0, NULL, 0)
-#define unzGoToNextFile64(A,B,C,D) unzGoToNextFile2(A,B,C,D, NULL, 0, NULL, 0)
-
-// --------------------- ZipFile ---------------------
-// from unzip.cpp
-#define UNZ_MAXFILENAMEINZIP 256
-
-struct ZipEntryInfo
-{
-    unz64_file_pos pos;
-    uint64_t uncompressed_size;
-};
-
-class ZipFilePrivate
-{
-public:
-    unzFile zipFile;
-    std::mutex zipFileMtx;
-
-    // std::unordered_map is faster if available on the platform
-    typedef std::unordered_map<std::string, struct ZipEntryInfo> FileListContainer;
-    FileListContainer fileList;
-};
-
-
-ZipFile::ZipFile(const std::string& zipFile, const std::string& filter)
-    : m_data(new ZipFilePrivate)
-{
-    m_data->zipFile = unzOpen(zipFile.c_str());
-    if (m_data->zipFile)
-    {
-        setFilter(filter);
-    }
-}
-
-ZipFile::~ZipFile()
-{
-    if (m_data && m_data->zipFile)
-    {
-        unzClose(m_data->zipFile);
-    }
-    delete (m_data);
-    m_data = nullptr;
-}
-
-bool ZipFile::isOpen() const
-{
-    return m_data->zipFile != nullptr;
-}
-
-bool ZipFile::setFilter(const std::string& filter)
-{
-    bool ret = false;
-    do
-    {
-        CC_BREAK_IF(!m_data);
-        CC_BREAK_IF(!m_data->zipFile);
-
-        // clear existing file list
-        m_data->fileList.clear();
-
-        // UNZ_MAXFILENAMEINZIP + 1 - it is done so in unzLocateFile
-        char szCurrentFileName[UNZ_MAXFILENAMEINZIP + 1];
-        unz_file_info64 fileInfo;
-        unz64_file_pos posInfo;
-
-        // go through all files and store position information about the required files
-        int err = unzGoToFirstFile64(m_data->zipFile, &fileInfo,
-            szCurrentFileName, sizeof(szCurrentFileName) - 1);
-        while (err == UNZ_OK)
-        {
-            int posErr = unzGetFilePos64(m_data->zipFile, &posInfo);
-            if (posErr == UNZ_OK)
-            {
-                // cache info about filtered files only (like 'assets/')
-                cxx17::string_view currentFileName = szCurrentFileName;
-                if (filter.empty()
-                    || (currentFileName.size() > filter.size() && cxx20::starts_with(currentFileName, cxx17::string_view(filter))))
-                {
-                    ZipEntryInfo entry;
-                    entry.pos = posInfo;
-                    entry.uncompressed_size = fileInfo.uncompressed_size;
-                    m_data->fileList[currentFileName.substr(filter.size()).data()] = entry;
-                }
-            }
-
-            // next file - also get the information about it
-            err = unzGoToNextFile64(m_data->zipFile, &fileInfo,
-                szCurrentFileName, sizeof(szCurrentFileName) - 1);
-        }
-        ret = true;
-
-    } while (false);
-
-    return ret;
-}
-
-bool ZipFile::fileExists(const std::string& fileName) const
-{
-    bool ret = false;
-    do
-    {
-        CC_BREAK_IF(!m_data);
-
-        ret = m_data->fileList.find(fileName) != m_data->fileList.end();
-    } while (false);
-
-    return ret;
-}
-
-// -------------------- fsni ---------------------
-
 #if defined(_WINDLL)
 #define FSNI_API __declspec(dllexport)
 #else
@@ -201,27 +65,8 @@ bool ZipFile::fileExists(const std::string& fileName) const
 #define FSNI_INVALID_FILE_HANDLE -1
 #define APK_PREFIX "jar:file://"
 #define APK_PREFIX_LEN sizeof(APK_PREFIX)
-static std::string s_streamingPath, s_persistPath;
-static ZipFile* s_zipFile = nullptr;
 
-struct fsni_stream {
-    union {
-        voidp entry;
-        int fd;
-    };
-    int64_t offset;
-    bool streaming; // whether in apk or obb file.
-};
-
-static yasio::gc::object_pool<fsni_stream, std::recursive_mutex> s_fsni_pool;
-
-static const int s_fsni_flags[][2] = {
-    O_READ_FLAGS,
-    O_WRITE_FLAGS,
-    O_APPEND_FLAGS,
-};
-
-// helper methods
+// path helper methods
 template<typename _Elem, typename _Pr, typename _Fn> inline
 void _fsni_splitpath(_Elem* s, _Pr _Pred, _Fn func) // will convert '\\' to '/'
 {
@@ -278,37 +123,106 @@ static void fsni_mkdir(std::string dir)
         });
 }
 
+static char s_default_scret[] = { 0xeb,0x1b,0x95,0xf9,0xb1,0x33,0x2a,0x20,0x66,0x26,0x66,0x36,0x57,0x1b,0x50,0xbb, };
+static char s_default_iv[] = { 0x24,0xf2,0xd5,0x3a,0x31,0xdf,0xae,0x8d,0xfb,0xad,0x43,0x8a,0x43,0x5e,0xa0,0xd0, };
+
+static const int s_fsni_flags[][2] = {
+    O_READ_FLAGS,
+    O_WRITE_FLAGS,
+    O_APPEND_FLAGS,
+};
+
+struct fsni_stream {
+    union {
+        voidp entry;
+        int fd;
+    };
+    int64_t offset;
+    bool streaming; // whether in apk or obb file.
+};
+
+struct fsni_stream_safe {
+    union {
+        voidp entry;
+        int fd;
+    };
+    int64_t offset;
+    bool streaming; // whether in apk or obb file.
+    AES_KEY secret;
+    unsigned char iv[16];
+};
+
+struct fsni_context {
+    std::string streamingPath, persistPath;
+    fsni::ZipFile zip;
+    std::string key;
+    std::string iv;
+    yasio::gc::object_pool<fsni_stream, std::recursive_mutex> filesPool;
+    yasio::gc::object_pool<fsni_stream_safe, std::recursive_mutex> safeFilesPool;
+};
+
+static void _fsni_setkey(std::string& lhs, const cxx17::string_view& rhs) {
+    static const size_t keyLen = 16;
+    if (!rhs.empty()) {
+        lhs.assign(rhs.data(), (std::min)(rhs.length(), keyLen));
+        if (lhs.size() < keyLen)
+            lhs.insert(lhs.end(), keyLen - lhs.size(), '\0'); // fill 0, if key insufficient
+    }
+    else
+        lhs.assign(keyLen, '\0');
+}
+
+static void _fsni_set_secret(fsni_context* ctx, const cxx17::string_view& key, const cxx17::string_view& iv)
+{
+    _fsni_setkey(ctx->key, key);
+    _fsni_setkey(ctx->iv, iv);
+}
+
+void _fsni_encrypt(fsni_context* ctx, void* inout, size_t size, int enc)
+{
+    if (size > 0) {
+        AES_KEY aeskey;
+
+        ossl_aes_set_encrypt_key((const unsigned char*)ctx->key.c_str(), 128, &aeskey);
+
+        unsigned char iv[16] = { 0 };
+        memcpy(iv, ctx->iv.c_str(), (std::min)(sizeof(iv), ctx->iv.size()));
+
+        int ignored_num = 0;
+        ossl_aes_cfb128_encrypt((unsigned char*)inout, (unsigned char*)inout, size, &aeskey, iv, &ignored_num, enc);
+    }
+}
+
+static fsni_context* s_fsni_ctx = nullptr;
+
 extern "C" {
-    FSNI_API void fsni_startup(const char* pszStreamingPath/*internal path*/, const char* pszPersistPath/*hot update path*/)
+    FSNI_API void fsni_startup(const char* streamingPath/*internal path*/, const char* persistPath/*hot update path*/)
     {
-        s_streamingPath = pszStreamingPath;
-        s_persistPath = pszPersistPath;
+        s_fsni_ctx = new fsni_context();
+        s_fsni_ctx->streamingPath = streamingPath;
+        s_fsni_ctx->persistPath = persistPath;
+
+        _fsni_set_secret(s_fsni_ctx, cxx17::string_view(s_default_scret, sizeof(s_default_scret)), cxx17::string_view(s_default_iv, sizeof(s_default_iv)));
 
         FSNI_LOGD("fsni_startup ---> streamingPath:%s, persistPath:%s", s_streamingPath.c_str(), s_persistPath.c_str());
 
-        if (cxx20::starts_with(cxx17::string_view(s_streamingPath), APK_PREFIX))
+        if (cxx20::starts_with(cxx17::string_view(s_fsni_ctx->streamingPath), APK_PREFIX))
         { // Android streamingPath format: jar:file://${APK_PATH}!/assets/
             // [FSNI] Init, streamingAssetsPath: jar:file:///data/app/com.c4games.redalert3d-TBAXBO37ccSyzWzUsJwcHQ==/base.apk!/assets
             // because filter always full relative to zip file, so should remove prefix
-            auto endpos = s_streamingPath.rfind("!/");
+            auto endpos = s_fsni_ctx->streamingPath.rfind("!/");
             if (endpos != std::string::npos) {
-                std::string apkPath = s_streamingPath.substr(APK_PREFIX_LEN - 1, endpos - APK_PREFIX_LEN + 1);
-                std::string strFilter = s_streamingPath.substr(endpos + 2);
-                s_zipFile = new ZipFile(apkPath, strFilter);
-                if (!s_zipFile->isOpen()) {
-                    delete s_zipFile;
-                    s_zipFile = nullptr;
-                }
+                std::string apkPath = s_fsni_ctx->streamingPath.substr(APK_PREFIX_LEN - 1, endpos - APK_PREFIX_LEN + 1);
+                std::string strFilter = s_fsni_ctx->streamingPath.substr(endpos + 2);
+                s_fsni_ctx->zip.open(apkPath, strFilter); // try open
             }
         }
     }
     FSNI_API void fsni_cleanup()
     {
-        s_streamingPath.clear();
-        s_persistPath.clear();
-        if (s_zipFile != nullptr) {
-            delete s_zipFile;
-            s_zipFile = nullptr;
+        if (s_fsni_ctx) {
+            delete s_fsni_ctx;
+            s_fsni_ctx = nullptr;
         }
     }
 
@@ -326,7 +240,7 @@ extern "C" {
         // try open from hot update path disk
         std::string fullPath;
         if (!absolute)
-            s_persistPath + fileName;
+            fullPath = s_fsni_ctx->persistPath + fileName;
         else
             fullPath = fileName;
         auto flags = s_fsni_flags[mode];
@@ -349,16 +263,16 @@ extern "C" {
             internalError = errno;
             if (readonly && !absolute) { // only readonly and not absolute path, we can try to read from app internal path
                 // try open from internal path
-                if (s_zipFile != nullptr) { // android, from apk
-                    auto it = s_zipFile->m_data->fileList.find(fileName);
-                    if (it != s_zipFile->m_data->fileList.end()) {
-                        entry = &it->second;
+                if (s_fsni_ctx->zip) { // android, from apk
+                    auto pEntry = s_fsni_ctx->zip.vopen(fileName);
+                    if (pEntry) {
+                        entry = pEntry;
                         streaming = true;
                     }
                     else error = ENOENT;
                 }
                 else { // ios, from disk
-                    fullPath = s_streamingPath + fileName;
+                    fullPath = s_fsni_ctx->streamingPath + fileName;
                     fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
                     if (fd == -1)
                         internalError = errno;
@@ -367,7 +281,7 @@ extern "C" {
         }
 
         if ((!streaming && fd != FSNI_INVALID_FILE_HANDLE) || (streaming && entry != nullptr)) {
-            fsni_stream* f = (fsni_stream*)s_fsni_pool.allocate();
+            fsni_stream* f = (fsni_stream*)s_fsni_ctx->filesPool.allocate();
             if (f != nullptr) {
                 f->entry = entry;
                 f->offset = 0;
@@ -392,32 +306,8 @@ extern "C" {
                     return posix_read(nfs->fd, buf, size);
             }
             else {
-                int n = 0;
-                do {
-                    auto entry = (ZipEntryInfo*)nfs->entry;
-                    CC_BREAK_IF(entry == nullptr);
-
-                    auto shared_data = s_zipFile->m_data;
-                    CC_BREAK_IF(nfs->offset >= entry->uncompressed_size);
-
-                    std::unique_lock<std::mutex> lck(shared_data->zipFileMtx);
-
-                    int nRet = unzGoToFilePos64(shared_data->zipFile, &entry->pos);
-                    CC_BREAK_IF(UNZ_OK != nRet);
-
-                    nRet = unzOpenCurrentFile(shared_data->zipFile);
-
-                    nRet = unzSeek64(shared_data->zipFile, nfs->offset, SEEK_SET);
-                    n = unzReadCurrentFile(shared_data->zipFile, buf, size);
-                    if (n > 0) {
-                        nfs->offset += n;
-                    }
-
-                    unzCloseCurrentFile(shared_data->zipFile);
-
-                } while (false);
-
-                return n;
+                int n = s_fsni_ctx->zip.read((fsni::ZipEntryInfo*)nfs->entry, nfs->offset, buf, size);
+                if (n > 0) nfs->offset += n;
             }
         }
 
@@ -443,7 +333,7 @@ extern "C" {
             }
             else {
                 long result = -1;
-                auto entry = (ZipEntryInfo*)nfs->entry;
+                auto entry = (fsni::ZipEntryInfo*)nfs->entry;
                 if (entry != nullptr) {
 
                     switch (origin) {
@@ -454,7 +344,7 @@ extern "C" {
                         result = nfs->offset + offset;
                         break;
                     case SEEK_END:
-                        result = (long)entry->uncompressed_size + offset;
+                        result = (long)fsni::ZipFile::size(entry) + offset;
                         break;
                     default:;
                     }
@@ -481,7 +371,7 @@ extern "C" {
                 if (nfs->fd != FSNI_INVALID_FILE_HANDLE)
                     posix_close(nfs->fd);
             }
-            s_fsni_pool.deallocate(nfs);
+            s_fsni_ctx->filesPool.deallocate(nfs);
         }
     }
 
@@ -522,8 +412,8 @@ extern "C" {
         }
 #endif
         // check android, from apk
-        if (!found && s_zipFile != nullptr) {
-            found = (s_zipFile->m_data->fileList.find(path) != s_zipFile->m_data->fileList.end());
+        if (!found && s_fsni_ctx->zip) {
+            found = s_fsni_ctx->zip.exists(path);
         }
 
         return found;
@@ -569,5 +459,138 @@ extern "C" {
         if (dup)
             memcpy(dup, p, size);
         return dup;
+    }
+
+    // -------- security file io ---------------
+    FSNI_API int fsni_write_all_safe(const char* fullPath, voidp data, int size)
+    {
+        int n = 0;
+        auto fp = fsni_open(fullPath, fsni_mode::write);
+        if (fp) {
+            _fsni_encrypt(s_fsni_ctx, data, size, AES_ENCRYPT);
+            n = fsni_write(fp, data, size);
+            fsni_close(fp);
+        }
+        return n;
+    }
+
+    FSNI_API voidp fsni_open_safe(const char* fileName, int mode)
+    {
+        union {
+            voidp entry;
+            int fd;
+        };
+
+        int internalError = 0, error = 0;
+
+        bool absolute = (fileName[0] == '/' || (isalpha(fileName[0]) && fileName[1] == ':'));
+
+        // try open from hot update path disk
+        std::string fullPath;
+        if (!absolute)
+            fullPath = s_fsni_ctx->persistPath + fileName;
+        else
+            fullPath = fileName;
+        auto flags = s_fsni_flags[mode];
+
+        bool readonly = flags[0] == s_fsni_flags[fsni_mode::read][0];
+        if (!readonly) { // try make file's parent directory
+            auto slash = fullPath.find_last_of(R"(/\)");
+            if (slash != std::string::npos) {
+                auto chTmp = fullPath[slash]; // store
+                fullPath[slash] = '\0';
+                if (!fsni_exists(fullPath.c_str(), fsni_chkflags::directory))
+                    fsni_mkdir(fullPath.substr(0, slash));
+                fullPath[slash] = chTmp; // restore
+            }
+        }
+
+        fd = posix_open(fullPath.c_str(), flags[0], flags[1]);
+        bool streaming = false;
+        if (fd == FSNI_INVALID_FILE_HANDLE) {
+            internalError = errno;
+            if (readonly && !absolute) { // only readonly and not absolute path, we can try to read from app internal path
+                // try open from internal path
+                if (s_fsni_ctx->zip) { // android, from apk
+                    auto pEntry = s_fsni_ctx->zip.vopen(fileName);
+                    if (pEntry) {
+                        entry = pEntry;
+                        streaming = true;
+                    }
+                    else error = ENOENT;
+                }
+                else { // ios, from disk
+                    fullPath = s_fsni_ctx->streamingPath + fileName;
+                    fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
+                    if (fd == -1)
+                        internalError = errno;
+                }
+            }
+        }
+
+        if ((!streaming && fd != FSNI_INVALID_FILE_HANDLE) || (streaming && entry != nullptr)) {
+            fsni_stream_safe* f = (fsni_stream_safe*)s_fsni_ctx->safeFilesPool.allocate();
+            if (f != nullptr) {
+                f->entry = entry;
+                f->offset = 0;
+                f->streaming = streaming;
+
+                ossl_aes_set_encrypt_key((const unsigned char*)s_fsni_ctx->key.c_str(), 128, &f->secret);
+                memcpy(f->iv, s_fsni_ctx->iv.c_str(), (std::min)(sizeof(f->iv), s_fsni_ctx->iv.size()));
+                return f;
+            }
+            else error = ENOMEM;
+        }
+
+        FSNI_LOGE("fsni_open ----> %s failed, internalError:%d(%s), error:%d(%s)!", fullPath.c_str(),
+            internalError, strerror(internalError),
+            error, strerror(error));
+        return nullptr;
+    }
+
+    FSNI_API int fsni_read_safe(voidp fp, voidp buf, int size)
+    {
+        fsni_stream_safe* nfs = (fsni_stream_safe*)fp;
+        int n = 0;
+        if (nfs != nullptr) {
+            if (!nfs->streaming) {
+                if (nfs->fd != FSNI_INVALID_FILE_HANDLE)
+                    n = posix_read(nfs->fd, buf, size);
+            }
+            else {
+                n = s_fsni_ctx->zip.read((fsni::ZipEntryInfo*)nfs->entry, nfs->offset, buf, size);
+                if (n > 0) nfs->offset += n;
+            }
+        }
+
+        if (n > 0) {
+            int ignored_num = 0;
+            ossl_aes_cfb128_encrypt((unsigned char*)buf, (unsigned char*)buf, size, &nfs->secret, nfs->iv, &ignored_num, AES_DECRYPT);
+        }
+
+        return n;
+    }
+
+    FSNI_API int fsni_write_safe(voidp fp, voidp buf, int size) {
+        fsni_stream_safe* nfs = (fsni_stream_safe*)fp;
+        if (nfs != nullptr && !nfs->streaming && nfs->fd != FSNI_INVALID_FILE_HANDLE)
+        { // for write mode, must always writeable path
+            int ignored_num = 0;
+            ossl_aes_cfb128_encrypt((unsigned char*)buf, (unsigned char*)buf, size, &nfs->secret, nfs->iv, &ignored_num, AES_ENCRYPT);
+            return posix_write(nfs->fd, buf, size);
+        }
+        return 0;
+    }
+
+    FSNI_API void fsni_close_safe(voidp fp)
+    {
+        fsni_stream_safe* nfs = (fsni_stream_safe*)fp;
+        if (nfs != nullptr) {
+            if (!nfs->streaming) {
+                if (nfs->fd != FSNI_INVALID_FILE_HANDLE)
+                    posix_close(nfs->fd);
+            }
+            s_fsni_ctx->safeFilesPool.deallocate(nfs);
+        }
     }
 }

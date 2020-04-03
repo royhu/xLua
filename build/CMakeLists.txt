@@ -128,7 +128,9 @@ set (FSNI_SRC
     fsni/ioapi.c
     fsni/unzip.c
     fsni/crypt.c
+    fsni/ZipFile.cpp
     fsni/fsni.cpp
+	fsni/aes_core.cpp
 )
 set_property(
     SOURCE ${FSNI_SRC}
