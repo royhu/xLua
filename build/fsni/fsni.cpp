@@ -132,6 +132,11 @@ static const int s_fsni_flags[][2] = {
     O_APPEND_FLAGS,
 };
 
+struct fsni_stream_secret {
+    AES_KEY key;
+    unsigned char iv[16];
+};
+
 struct fsni_stream {
     union {
         voidp entry;
@@ -139,17 +144,7 @@ struct fsni_stream {
     };
     int64_t offset;
     bool streaming; // whether in apk or obb file.
-};
-
-struct fsni_stream_safe {
-    union {
-        voidp entry;
-        int fd;
-    };
-    int64_t offset;
-    bool streaming; // whether in apk or obb file.
-    AES_KEY secret;
-    unsigned char iv[16];
+    fsni_stream_secret* secret;
 };
 
 struct fsni_context {
@@ -158,7 +153,7 @@ struct fsni_context {
     std::string key;
     std::string iv;
     yasio::gc::object_pool<fsni_stream, std::recursive_mutex> filesPool;
-    yasio::gc::object_pool<fsni_stream_safe, std::recursive_mutex> safeFilesPool;
+    yasio::gc::object_pool<fsni_stream_secret, std::recursive_mutex> secretsPool;
 };
 
 static void _fsni_setkey(std::string& lhs, const cxx17::string_view& rhs) {
@@ -176,21 +171,6 @@ static void _fsni_set_secret(fsni_context* ctx, const cxx17::string_view& key, c
 {
     _fsni_setkey(ctx->key, key);
     _fsni_setkey(ctx->iv, iv);
-}
-
-void _fsni_encrypt(fsni_context* ctx, void* inout, size_t size, int enc)
-{
-    if (size > 0) {
-        AES_KEY aeskey;
-
-        ossl_aes_set_encrypt_key((const unsigned char*)ctx->key.c_str(), 128, &aeskey);
-
-        unsigned char iv[16] = { 0 };
-        memcpy(iv, ctx->iv.c_str(), (std::min)(sizeof(iv), ctx->iv.size()));
-
-        int ignored_num = 0;
-        ossl_aes_cfb128_encrypt((unsigned char*)inout, (unsigned char*)inout, size, &aeskey, iv, &ignored_num, enc);
-    }
 }
 
 static fsni_context* s_fsni_ctx = nullptr;
@@ -243,7 +223,7 @@ extern "C" {
             fullPath = s_fsni_ctx->persistPath + fileName;
         else
             fullPath = fileName;
-        auto flags = s_fsni_flags[mode];
+        auto flags = s_fsni_flags[mode & 0xff];
 
         bool readonly = flags[0] == s_fsni_flags[fsni_mode::read][0];
         if (!readonly) { // try make file's parent directory
@@ -281,11 +261,21 @@ extern "C" {
         }
 
         if ((!streaming && fd != FSNI_INVALID_FILE_HANDLE) || (streaming && entry != nullptr)) {
-            fsni_stream* f = (fsni_stream*)s_fsni_ctx->filesPool.allocate();
+            fsni_stream* f = (fsni_stream*)s_fsni_ctx->filesPool.construct();
             if (f != nullptr) {
                 f->entry = entry;
                 f->offset = 0;
                 f->streaming = streaming;
+
+                if (!(mode >> 16)) { // high word to mark whether open file as secret.
+                    f->secret = nullptr;
+                }
+                else {
+                    auto secret = (fsni_stream_secret*)s_fsni_ctx->secretsPool.allocate();
+                    ossl_aes_set_encrypt_key((const unsigned char*)s_fsni_ctx->key.c_str(), 128, &secret->key);
+                    memcpy(secret->iv, s_fsni_ctx->iv.c_str(), (std::min)(sizeof(secret->iv), s_fsni_ctx->iv.size()));
+                    f->secret = secret;
+                }
                 return f;
             }
             else error = ENOMEM;
@@ -299,25 +289,34 @@ extern "C" {
 
     FSNI_API int fsni_read(voidp fp, voidp buf, int size)
     {
+        int n = 0;
         fsni_stream* nfs = (fsni_stream*)fp;
         if (nfs != nullptr) {
             if (!nfs->streaming) {
                 if (nfs->fd != FSNI_INVALID_FILE_HANDLE)
-                    return posix_read(nfs->fd, buf, size);
+                    n = posix_read(nfs->fd, buf, size);
             }
             else {
-                int n = s_fsni_ctx->zip.read((fsni::ZipEntryInfo*)nfs->entry, nfs->offset, buf, size);
-                if (n > 0) nfs->offset += n;
+                n = s_fsni_ctx->zip.read((fsni::ZipEntryInfo*)nfs->entry, nfs->offset, buf, size);
+                nfs->offset += n;
+            }
+
+            if (nfs->secret && n > 0) {
+                int ignored_num = 0;
+                ossl_aes_cfb128_encrypt((unsigned char*)buf, (unsigned char*)buf, size, &nfs->secret->key, nfs->secret->iv, &ignored_num, AES_DECRYPT);
             }
         }
-
-        return 0;
+        return n;
     }
 
     FSNI_API int fsni_write(voidp fp, const voidp buf, int size) {
         fsni_stream* nfs = (fsni_stream*)fp;
         if (nfs != nullptr && !nfs->streaming && nfs->fd != FSNI_INVALID_FILE_HANDLE)
         { // for write mode, must always writeable path
+            if (nfs->secret && size > 0) {
+                int ignored_num = 0;
+                ossl_aes_cfb128_encrypt((unsigned char*)buf, (unsigned char*)buf, size, &nfs->secret->key, nfs->secret->iv, &ignored_num, AES_ENCRYPT);
+            }
             return posix_write(nfs->fd, buf, size);
         }
         return 0;
@@ -371,6 +370,8 @@ extern "C" {
                 if (nfs->fd != FSNI_INVALID_FILE_HANDLE)
                     posix_close(nfs->fd);
             }
+            if (nfs->secret)
+                s_fsni_ctx->secretsPool.deallocate(nfs->secret);
             s_fsni_ctx->filesPool.deallocate(nfs);
         }
     }
@@ -459,138 +460,5 @@ extern "C" {
         if (dup)
             memcpy(dup, p, size);
         return dup;
-    }
-
-    // -------- security file io ---------------
-    FSNI_API int fsni_write_all_safe(const char* fullPath, voidp data, int size)
-    {
-        int n = 0;
-        auto fp = fsni_open(fullPath, fsni_mode::write);
-        if (fp) {
-            _fsni_encrypt(s_fsni_ctx, data, size, AES_ENCRYPT);
-            n = fsni_write(fp, data, size);
-            fsni_close(fp);
-        }
-        return n;
-    }
-
-    FSNI_API voidp fsni_open_safe(const char* fileName, int mode)
-    {
-        union {
-            voidp entry;
-            int fd;
-        };
-
-        int internalError = 0, error = 0;
-
-        bool absolute = (fileName[0] == '/' || (isalpha(fileName[0]) && fileName[1] == ':'));
-
-        // try open from hot update path disk
-        std::string fullPath;
-        if (!absolute)
-            fullPath = s_fsni_ctx->persistPath + fileName;
-        else
-            fullPath = fileName;
-        auto flags = s_fsni_flags[mode];
-
-        bool readonly = flags[0] == s_fsni_flags[fsni_mode::read][0];
-        if (!readonly) { // try make file's parent directory
-            auto slash = fullPath.find_last_of(R"(/\)");
-            if (slash != std::string::npos) {
-                auto chTmp = fullPath[slash]; // store
-                fullPath[slash] = '\0';
-                if (!fsni_exists(fullPath.c_str(), fsni_chkflags::directory))
-                    fsni_mkdir(fullPath.substr(0, slash));
-                fullPath[slash] = chTmp; // restore
-            }
-        }
-
-        fd = posix_open(fullPath.c_str(), flags[0], flags[1]);
-        bool streaming = false;
-        if (fd == FSNI_INVALID_FILE_HANDLE) {
-            internalError = errno;
-            if (readonly && !absolute) { // only readonly and not absolute path, we can try to read from app internal path
-                // try open from internal path
-                if (s_fsni_ctx->zip) { // android, from apk
-                    auto pEntry = s_fsni_ctx->zip.vopen(fileName);
-                    if (pEntry) {
-                        entry = pEntry;
-                        streaming = true;
-                    }
-                    else error = ENOENT;
-                }
-                else { // ios, from disk
-                    fullPath = s_fsni_ctx->streamingPath + fileName;
-                    fd = posix_open(fullPath.c_str(), O_READ_FLAGS);
-                    if (fd == -1)
-                        internalError = errno;
-                }
-            }
-        }
-
-        if ((!streaming && fd != FSNI_INVALID_FILE_HANDLE) || (streaming && entry != nullptr)) {
-            fsni_stream_safe* f = (fsni_stream_safe*)s_fsni_ctx->safeFilesPool.allocate();
-            if (f != nullptr) {
-                f->entry = entry;
-                f->offset = 0;
-                f->streaming = streaming;
-
-                ossl_aes_set_encrypt_key((const unsigned char*)s_fsni_ctx->key.c_str(), 128, &f->secret);
-                memcpy(f->iv, s_fsni_ctx->iv.c_str(), (std::min)(sizeof(f->iv), s_fsni_ctx->iv.size()));
-                return f;
-            }
-            else error = ENOMEM;
-        }
-
-        FSNI_LOGE("fsni_open ----> %s failed, internalError:%d(%s), error:%d(%s)!", fullPath.c_str(),
-            internalError, strerror(internalError),
-            error, strerror(error));
-        return nullptr;
-    }
-
-    FSNI_API int fsni_read_safe(voidp fp, voidp buf, int size)
-    {
-        fsni_stream_safe* nfs = (fsni_stream_safe*)fp;
-        int n = 0;
-        if (nfs != nullptr) {
-            if (!nfs->streaming) {
-                if (nfs->fd != FSNI_INVALID_FILE_HANDLE)
-                    n = posix_read(nfs->fd, buf, size);
-            }
-            else {
-                n = s_fsni_ctx->zip.read((fsni::ZipEntryInfo*)nfs->entry, nfs->offset, buf, size);
-                if (n > 0) nfs->offset += n;
-            }
-        }
-
-        if (n > 0) {
-            int ignored_num = 0;
-            ossl_aes_cfb128_encrypt((unsigned char*)buf, (unsigned char*)buf, size, &nfs->secret, nfs->iv, &ignored_num, AES_DECRYPT);
-        }
-
-        return n;
-    }
-
-    FSNI_API int fsni_write_safe(voidp fp, voidp buf, int size) {
-        fsni_stream_safe* nfs = (fsni_stream_safe*)fp;
-        if (nfs != nullptr && !nfs->streaming && nfs->fd != FSNI_INVALID_FILE_HANDLE)
-        { // for write mode, must always writeable path
-            int ignored_num = 0;
-            ossl_aes_cfb128_encrypt((unsigned char*)buf, (unsigned char*)buf, size, &nfs->secret, nfs->iv, &ignored_num, AES_ENCRYPT);
-            return posix_write(nfs->fd, buf, size);
-        }
-        return 0;
-    }
-
-    FSNI_API void fsni_close_safe(voidp fp)
-    {
-        fsni_stream_safe* nfs = (fsni_stream_safe*)fp;
-        if (nfs != nullptr) {
-            if (!nfs->streaming) {
-                if (nfs->fd != FSNI_INVALID_FILE_HANDLE)
-                    posix_close(nfs->fd);
-            }
-            s_fsni_ctx->safeFilesPool.deallocate(nfs);
-        }
     }
 }

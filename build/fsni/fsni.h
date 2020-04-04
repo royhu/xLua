@@ -1,7 +1,7 @@
 /****************************************************************************
-Copyright (c) 2010 cocos2d-x.org
+Copyright (c) 2020 c4games.com
 
-http://www.cocos2d-x.org
+https://github.com/c4games
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -24,7 +24,7 @@ THE SOFTWARE.
 #ifndef _FSNI_H_
 #define _FSNI_H_
 
-#define FSNI_VER "1.1.2"
+#define FSNI_VER "1.1.3"
 
 #if defined(_WINDLL)
 #  if defined(LUA_LIB)
@@ -40,19 +40,57 @@ THE SOFTWARE.
 
 /*
 The File Stream Native Interface
-DllImports for C#
+The DllImports for C#
+
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
-public static extern void fsni_startup(string streamingAssetPath, string persistDataPath);
+public static extern int fsni_startup(string streamingAssetsPath, string persistentDataPath);
+
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
-public static extern IntPtr fsni_open(string fileName);
+public static extern IntPtr fsni_open(string fileName, int mode);
+
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
-public static extern int fsni_read(IntPtr fp, byte[] buf, int size);
+public static extern int fsni_read(IntPtr fp, byte[] buf, int len);
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern int fsni_read(IntPtr fp, IntPtr buf, int len);
+
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern int fsni_write(IntPtr fp, byte[] buf, int len);
+
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
 public static extern int fsni_seek(IntPtr fp, int offset, int origin);
+
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
 public static extern void fsni_close(IntPtr fp);
+
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
 public static extern int fsni_getsize(IntPtr fp);
+
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern int fsni_remove(string path);
+
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern int fsni_rename(string oldName, string newName);
+
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern bool fsni_exists(string path, int flags);
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern IntPtr fsni_alloc(int size);
+
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern void fsni_free(IntPtr buf);
+
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern IntPtr fsni_strdup(string s, out int len);
+
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern int fsni_strlen(string s);
+
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern IntPtr fsni_strndup(string s, int len);
+
+[DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
+public static extern IntPtr fsni_memdup(IntPtr s, int len);
+
 [DllImport(LIBNAME, CallingConvention = CallingConvention.Cdecl)]
 public static extern void fsni_cleanup();
 */
@@ -67,6 +105,7 @@ namespace fsni_mode {
         read,
         write,
         append,
+        security = 1 << 16,
     };
 };
 
@@ -95,14 +134,6 @@ extern "C" {
     FSNI_API int fsni_strlen(const char* s);
     FSNI_API voidp fsni_strndup(const char* s, int len);
     FSNI_API voidp fsni_memdup(const voidp p, int size);
-
-    // safe save file data
-    FSNI_API int fsni_write_all_safe(const char* fullPath, voidp data, int size);
-
-    FSNI_API voidp fsni_open_safe(const char* fileName, int mode);
-    FSNI_API int fsni_read_safe(voidp fp, voidp buf, int size);
-    FSNI_API int fsni_write_safe(voidp fp, voidp data, int size);
-    FSNI_API void fsni_close_safe(voidp fp);
 
     /*
     @flags: 1: check file exists, 2: check directory exists£¬ 3£º check file or directory exists
