@@ -52,6 +52,7 @@
 #define posix_lseek ::lseek
 #define posix_read ::read
 #define posix_write ::write
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -184,7 +185,7 @@ extern "C" {
 
         _fsni_set_secret(s_fsni_ctx, cxx17::string_view(s_default_scret, sizeof(s_default_scret)), cxx17::string_view(s_default_iv, sizeof(s_default_iv)));
 
-        FSNI_LOGD("fsni_startup ---> streamingPath:%s, persistPath:%s", s_streamingPath.c_str(), s_persistPath.c_str());
+        FSNI_LOGD("fsni_startup ---> streamingPath:%s, persistPath:%s", streamingPath, persistPath);
 
         if (cxx20::starts_with(cxx17::string_view(s_fsni_ctx->streamingPath), APK_PREFIX))
         { // Android streamingPath format: jar:file://${APK_PATH}!/assets/
