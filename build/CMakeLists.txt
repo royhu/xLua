@@ -253,7 +253,8 @@ source_group_by_dir(${CMAKE_CURRENT_SOURCE_DIR} XLUA_CORE)
 
 if (APPLE)
     if (IOS)
-        set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD)")
+        #set(CMAKE_OSX_ARCHITECTURES "$(ARCHS_STANDARD)")
+	set(CMAKE_OSX_ARCHITECTURES "arm64 arm64e armv7 armv7s")
         add_library(xlua STATIC
            ${LUA_CORE}
            ${LUA_LIB}
